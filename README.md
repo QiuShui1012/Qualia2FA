@@ -52,7 +52,7 @@ git submodule update --init --recursive
 本仓库根目录下。
 
 > FFI 绑定层（[`Qualia2FA-FFI`](https://github.com/QiuShui1012/Qualia2FA-FFI)）
-> 目前是独立仓库，待其接口稳定后再以 submodule 引入。
+> 待接口稳定后会出现在这里，作为 `Core/` 的兄弟目录。
 
 ## 参与贡献
 
