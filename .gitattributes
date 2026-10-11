@@ -1,0 +1,22 @@
+# 统一为 LF，避免在 Windows 上签出 CRLF 造成无意义的整文件差异。
+#
+# 对 Gradle / Kotlin / Swift 项目尤其重要：Gradle 的构建缓存与增量编译
+# 会因行尾变化而整体失效，一个 CRLF 转换就可能让一次全量重编译。
+* text=auto eol=lf
+
+# 但 Windows 批处理必须保持 CRLF，否则 cmd.exe 解析会出问题。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制资源
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.jar binary
+
+# Gradle wrapper 的 jar 必须按二进制处理
+gradle/wrapper/*.jar binary
