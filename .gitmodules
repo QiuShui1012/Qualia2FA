@@ -1,15 +1,12 @@
 [submodule "Core"]
 	path = Core
-	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
-[submodule "keystore"]
-	path = keystore
-	url = https://github.com/QiuShui1012/Qualia2FA-Keystore.git
+	url = https://github.com/Qualia2FA/Qualia2FA-Core.git
+	branch = master
+[submodule "QualiaDeviceIdentityKit"]
+	path = QualiaDeviceIdentityKit
+	url = https://github.com/Qualia2FA/QualiaDeviceIdentityKit.git
+	branch = master
 [submodule "FFI"]
 	path = FFI
-	url = https://github.com/QiuShui1012/Qualia2FA-FFI.git
-[submodule "keystore/Core"]
-	path = keystore/Core
-	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
-[submodule "FFI/Core"]
-	path = FFI/Core
-	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
+	url = https://github.com/Qualia2FA/Qualia2FA-FFI.git
+	branch = master

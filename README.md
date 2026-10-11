@@ -29,7 +29,7 @@
 ## 获取与构建
 
 ```bash
-git clone --recurse-submodules https://github.com/QiuShui1012/Qualia2FA
+git clone --recurse-submodules https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
 ```
 
@@ -85,7 +85,7 @@ cargo test --manifest-path FFI/Cargo.toml
 ### 初始化开发环境
 
 ```bash
-git clone --recurse-submodules https://github.com/QiuShui1012/Qualia2FA
+git clone --recurse-submodules https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
 cargo test --manifest-path Core/Cargo.toml --all-targets   # 先确认核心库全绿
 ```
