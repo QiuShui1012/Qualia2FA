@@ -1,67 +1,79 @@
-# Qualia2FA-UI
+# Qualia2FA
 
-Qualia2FA 的**界面端**：Compose Multiplatform 应用，覆盖 Windows 桌面（JVM）、
-Android 与 iOS。
+一个**无中心服务器、不实时同步**的多平台双因素认证（2FA）应用。
 
-> 本仓库是**独立仓库**。所有路径都相对于**本仓库根目录**，不假设任何上层目录结构。
-
-## 元信息
+不同设备各自独立运行，不依赖任何厂商的服务器，也不需要注册账号或设置主密码。
+在已登录同一账号的设备之间可以直接分享 2FA 条目，合并规则取并集。
 
 | 项 | 值 |
 |---|---|
-| 状态 | **M0 骨架**——仅建立仓库与依赖关系，尚无界面代码 |
-| UI 框架 | Compose Multiplatform |
-| 目标平台 | Windows 桌面（**JVM** 目标）、Android、iOS |
-| FFI 方案 | UniFFI + Gobley |
-| 许可证 | LGPL-3.0-or-later（待补 LICENSE） |
+| 平台 | Windows 桌面、Android、iOS |
+| 界面 | Compose Multiplatform |
+| 许可证 | LGPL-3.0-or-later |
 
-## 依赖关系
+## 设计取向
 
-```
-Qualia2FA-UI (本仓库)
-├── Core/  ← git submodule → qualia2fa-core     纯逻辑，无 unsafe，无 I/O
-└── (未来) FFI/ ← git submodule → qualia2fa-ffi  UniFFI 绑定层
-```
+- **无中心**：没有服务端、没有账号体系、没有「忘记密码」流程。你的密钥只在你自己的
+  设备上。
+- **不实时同步**：设备之间按需手动分享，而不是后台持续对账。因此不存在「同步冲突」
+  这个类别的问题，也不会因为服务器宕机而拿不到验证码。
+- **端到端加密**：条目在离开设备前就已加密，分享通道上的任何中间人都拿不到明文。
+- **离线可用**：断网时所有功能照常，验证码照常计算。
 
-本仓库目前**只引入 `Core`**。`FFI` 层暂在 workspace 根独立存在，待其稳定后再以
-submodule 方式移入本仓库——届时 `FFI` 的 `../Core` 路径依赖将正好指向本仓库的
-`Core/`，不需要改动 `FFI` 的 `Cargo.toml`。
+## 当前状态
 
-### 初始化
+**开发早期。** 核心库（TOTP/HOTP 计算、`otpauth://` 解析）已在
+[`Qualia2FA-Core`](https://github.com/QiuShui1012/Qualia2FA-Core) 完成并有测试覆盖；
+界面尚未开始。目前还不能作为日常使用的 2FA 应用。
+
+## 获取与构建
 
 ```bash
-git clone --recurse-submodules <本仓库地址>
-# 或已克隆后：
+git clone --recurse-submodules https://github.com/QiuShui1012/Qualia2FA
+cd Qualia2FA
+```
+
+若已克隆但忘了 `--recurse-submodules`：
+
+```bash
 git submodule update --init --recursive
 ```
 
-## 为什么桌面端选 JVM 而不是 Kotlin/Native
+构建说明随界面代码的落地一并补上。
 
-已调研并**否决**了两条无 JVM 的路线（`bitsycore/compose-desktop-native` 与
-`brahmkshatriya/compose-native`，详见 workspace 根的 `TODO.md` §4.5）。理由摘要：
+## 目录结构
 
-- Skiko（**YouTrack SKIKO-580**，`resolved: null`）是 GraalVM native-image 的
-  真正阻塞点，**不是 JNA**——所以「去掉 JNA」并不能打开 GraalVM 路线
-- 两个 Kotlin/Native 移植都只有 `-alpha` 版本，Windows UIA 桥缺失 COM 适配层、
-  macOS 侧仍是占位实现、不支持多显示器与原生文件对话框
-- 官方 Compose + jlink/jpackage 的产物体积已可接受：实测 **naive 149.36 MB →
-  Compose 默认 73.10 MB → 再加压缩 45.47 MB**
+```
+.
+└── Core/    ← git submodule → Qualia2FA-Core
+```
 
-## 打包
+`Core/` 是本项目依赖的核心库，承载全部密码学与 2FA 逻辑。界面代码将直接建在
+本仓库根目录下。
 
-用 **jlink + jpackage** 产出离线自包含安装包。**不使用 Conveyor**——已实测否决，
-理由见 `TODO.md` §4.6：
+> FFI 绑定层（[`Qualia2FA-FFI`](https://github.com/QiuShui1012/Qualia2FA-FFI)）
+> 目前是独立仓库，待其接口稳定后再以 submodule 引入。
 
-- 其 12.0 版对 `eton-desktop` 的实测产物（MSIX 79.66 MB / zip 78.49 MB）落在
-  jpackage+jlink 的 70–85 MB 基线之内，并无体积优势
-- 那个 0.6 MB 的 exe 是**下载器**，会从作者自己的站点拉取内容——不满足本项目的
-  离线优先要求
-- 其 jdeps/jlink 裁剪并非独有：Compose 的 Gradle 插件已内置
-  `suggestRuntimeModules` 且默认裁得更多
+## 参与贡献
 
-> ⚠️ **不要用 MSIX**：其 AppData 虚拟化有丢失 TOTP 种子数据的风险。
+界面代码尚未开始，因此现在最适合参与的是设计讨论与核心库的完善
+（见 [`Qualia2FA-Core`](https://github.com/QiuShui1012/Qualia2FA-Core)）。
 
-## 待办
+开始之前请注意本项目的两条硬约束：
 
-界面代码尚未开始。完整里程碑见 workspace 根的 `TODO.md`（M5 为 UI 绑定验证，
-含 3 个 spike 项）。
+- **密码学实现不接受「看起来能跑」的改动。** 一切以规范正文的测试向量为准。
+  核心库已有 RFC 4226 / 6238 / 4648 的完整向量测试，新增实现必须同样有出处。
+- **秘密材料不得进入日志、错误消息或持久化的明文中。** 这是不可协商的。
+
+### 初始化开发环境
+
+```bash
+git clone --recurse-submodules https://github.com/QiuShui1012/Qualia2FA
+cd Qualia2FA/Core
+cargo test --all-targets      # 先确认核心库在你机器上全绿
+```
+
+## 许可证
+
+GNU Lesser General Public License v3.0 or later（`LGPL-3.0-or-later`）。
+见 [`LICENSE`](LICENSE) 与 [`COPYING.LESSER`](COPYING.LESSER)。
