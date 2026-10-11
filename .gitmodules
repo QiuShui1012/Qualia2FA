@@ -10,3 +10,6 @@
 	path = FFI
 	url = https://github.com/Qualia2FA/Qualia2FA-FFI.git
 	branch = master
+[submodule "FFI/Core"]
+	path = FFI/Core
+	url = https://github.com/Qualia2FA/Qualia2FA-Core.git
