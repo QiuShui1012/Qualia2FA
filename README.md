@@ -9,7 +9,7 @@
 |---|---|
 | 平台 | Windows 桌面、Android、iOS |
 | 界面 | Compose Multiplatform |
-| 许可证 | LGPL-3.0-or-later |
+| 许可证 | Apache-2.0 |
 
 ## 设计取向
 
@@ -75,5 +75,8 @@ cargo test --all-targets      # 先确认核心库在你机器上全绿
 
 ## 许可证
 
-GNU Lesser General Public License v3.0 or later（`LGPL-3.0-or-later`）。
-见 [`LICENSE`](LICENSE) 与 [`COPYING.LESSER`](COPYING.LESSER)。
+Apache License 2.0，见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)。
+
+本仓库作为**应用**授权，与它依赖的库授权不同：核心库与 FFI 绑定层各自以
+LGPL-3.0-or-later 授权。两套许可证的组合是有意选择——应用层用宽松许可证，
+便于分发与二次开发；核心的密码学实现保持 copyleft，使任何修改都必须回馈。
