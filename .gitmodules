@@ -1,3 +1,15 @@
 [submodule "Core"]
 	path = Core
 	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
+[submodule "keystore"]
+	path = keystore
+	url = https://github.com/QiuShui1012/Qualia2FA-Keystore.git
+[submodule "FFI"]
+	path = FFI
+	url = https://github.com/QiuShui1012/Qualia2FA-FFI.git
+[submodule "keystore/Core"]
+	path = keystore/Core
+	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
+[submodule "FFI/Core"]
+	path = FFI/Core
+	url = https://github.com/QiuShui1012/Qualia2FA-Core.git
