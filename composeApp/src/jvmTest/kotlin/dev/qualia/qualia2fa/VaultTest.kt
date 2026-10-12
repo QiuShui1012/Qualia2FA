@@ -63,6 +63,60 @@ class VaultTest {
         assertNotNull(Qualia.openVault(data, store), "the registered vault must reopen")
     }
 
+    /**
+     * A whole pairing, both sides, in one process.
+     *
+     * The host registers, starts a pairing and hands out its payload; the joiner reads it,
+     * sends a request, and the host authorises it, which is the call that hands over the
+     * master key. The joiner must then be able to open the **host's** vault file, which is
+     * the property that makes the whole flow worth anything.
+     *
+     * It needs a platform key store on both sides, so a machine without one skips.
+     */
+    @Test
+    fun twoDevicesCompleteAPairing() {
+        val hostStore = MemoryStore()
+        val registration = Qualia.register(hostStore, "qualia2fa-test-host")
+        if (registration == null) {
+            println("skipping: no usable platform key store on this machine")
+            return
+        }
+
+        val hostVault = registration.vault
+        assertNotNull(hostVault.addEntry("Shared", "Example", "", secret, 6, 30, "", 1_700_000_000))
+        val hostVaultFile = assertNotNull(hostVault.serialize())
+
+        val host = assertNotNull(Qualia.beginPairing(), "the host side must start")
+        val payload = host.payload
+        assertTrue(payload.isNotBlank(), "the pairing payload must not be empty")
+
+        val joiner = assertNotNull(
+            Qualia.joinPairing(payload, "qualia2fa-test-joiner"),
+            "the payload must be accepted as a pairing code",
+        )
+        val request = assertNotNull(joiner.request(), "the joiner must produce a request")
+        assertNotNull(joiner.identity(), "the joiner must have an identity once it asked")
+
+        val reply = assertNotNull(hostVault.authorize(host, request), "the host must authorise the request")
+        assertNotNull(host.joinerDeviceId, "the host must be able to show who is asking")
+
+        val joinerStore = MemoryStore()
+        val joined = assertNotNull(joiner.complete(reply, joinerStore), "the joiner must complete")
+        assertEquals(0, joined.entryCount, "pairing hands over the key, not the entries")
+
+        val asSeenByJoiner = assertNotNull(
+            Qualia.openVault(hostVaultFile, joinerStore),
+            "the joined device must be able to open the host's vault",
+        )
+        assertEquals(1, asSeenByJoiner.entryCount)
+        assertEquals("Shared", asSeenByJoiner.entries().first().name)
+
+        assertNull(
+            Qualia.joinPairing("not a pairing code", "qualia2fa-test-joiner"),
+            "a payload that is not a pairing code must be rejected",
+        )
+    }
+
     @Test
     fun aLocalVaultRoundTripsThroughItsFile() {
         val store = MemoryStore()

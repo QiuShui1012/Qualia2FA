@@ -3,6 +3,8 @@ package dev.qualia.qualia2fa
 import dev.qualia.qualia2fa.ffi.FfiAlgorithm
 import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
+import dev.qualia.qualia2fa.ffi.FfiJoiner
+import dev.qualia.qualia2fa.ffi.FfiLogin
 import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
 import dev.qualia.qualia2fa.ffi.FfiSecureStore
 import dev.qualia.qualia2fa.ffi.FfiVault
@@ -140,6 +142,15 @@ class Vault internal constructor(private val inner: FfiVault) {
         } catch (_: Exception) {
             false
         }
+
+    /**
+     * Authorises [host]'s pairing request with this vault's key.
+     *
+     * This is the moment the master key is handed to the other device, so the caller must
+     * have asked the user first, and should show [PairingHost.joinerDeviceId] while doing
+     * it. Returns the reply to carry back, or `null` when the request was not accepted.
+     */
+    fun authorize(host: PairingHost, request: ByteArray): ByteArray? = host.authorizeWith(inner, request)
 
     /** The vault file contents, to be written to disk by the caller. */
     fun serialize(): ByteArray? =
@@ -324,8 +335,89 @@ object Qualia {
             null
         }
 
+    /** Starts the host side of a pairing: the text it returns is what goes into the code. */
+    fun beginPairing(): PairingHost? =
+        try {
+            PairingHost(FfiLogin.begin())
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Starts the joining side from the text that was scanned, using [label] for this
+     * device's identity key pair. Returns `null` when the text is not a pairing code or
+     * the platform key store is unavailable.
+     */
+    fun joinPairing(qrText: String, label: String): PairingJoiner? =
+        try {
+            PairingJoiner(FfiJoiner.fromQr(qrText, label), FfiPlatformKeys.open(label))
+        } catch (_: Exception) {
+            null
+        }
+
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32
+}
+
+/**
+ * The device that already holds the account, on the side that shows the code.
+ *
+ * Its payload is a short text; whoever scans it can ask to be let in. Nothing is handed
+ * over until [Vault.authorize] is called, and the user is the one who decides that.
+ */
+class PairingHost internal constructor(private val inner: FfiLogin) {
+    /** The text to put into the QR code. */
+    val payload: String get() = inner.payload()
+
+    /**
+     * The device identifier of the requester, available once its request arrived. Show it
+     * to the user: comparing it out of band is what makes the confirmation mean something.
+     */
+    val joinerDeviceId: String? get() = inner.joinerDeviceId()
+
+    internal fun authorizeWith(vault: FfiVault, request: ByteArray): ByteArray? =
+        try {
+            inner.authorize(vault, request)
+        } catch (_: Exception) {
+            null
+        }
+}
+
+/**
+ * The device that is joining, on the side that scanned the code.
+ *
+ * It carries its own device identity from the platform key store, which is what the host
+ * verifies before releasing the master key.
+ */
+class PairingJoiner internal constructor(
+    private val inner: FfiJoiner,
+    private val keys: FfiPlatformKeys,
+) {
+    /** The request to carry back to the host. */
+    fun request(): ByteArray? =
+        try {
+            inner.request(PlatformKeysBridge(keys))
+        } catch (_: Exception) {
+            null
+        }
+
+    /** This device's public identity, once [request] produced one. */
+    fun identity(): ByteArray? = inner.identity()
+
+    /**
+     * Verifies the reply, writes the master key into [store] and returns the vault it
+     * unlocks, or `null` when the reply did not verify — a wrong session, a tampered
+     * message, or a host using a different master key all look the same from here.
+     */
+    fun complete(reply: ByteArray, store: MasterKeyStore): Vault? =
+        try {
+            val key = inner.complete(reply, PlatformKeysBridge(keys), StoreBridge(store))
+            val vault = Vault(FfiVault.fromMasterKey(key))
+            wipe(key)
+            vault
+        } catch (_: Exception) {
+            null
+        }
 }
 
 /**
