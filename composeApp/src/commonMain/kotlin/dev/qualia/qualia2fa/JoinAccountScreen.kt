@@ -60,6 +60,23 @@ fun JoinAccountScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        OutlinedButton(onClick = {
+            val image = pickGrayImage()
+            if (image == null) {
+                message = "没有读到图片（取消，或者文件无法解码）。"
+            } else {
+                val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
+                if (read == null) {
+                    message = "这张图片里没有可读的配对码。"
+                } else {
+                    payload = read
+                    message = "已从图片读入配对码。"
+                }
+            }
+        }) {
+            Text("从图片读取配对码")
+        }
+
         Button(
             onClick = {
                 val started = Qualia.joinPairing(payload.trim(), DEVICE_LABEL)
