@@ -1,4 +1,5 @@
 import gobley.gradle.GobleyHost
+import gobley.gradle.Variant
 import gobley.gradle.cargo.dsl.jvm
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.net.URI
@@ -80,6 +81,13 @@ kotlin {
 // crate by the `materializeRustSource` task in the root build script.
 cargo {
     packageDirectory = layout.projectDirectory.dir("rust")
+
+    // Gobley defaults the JVM variant to Debug, which is the wrong default for an
+    // application project: `subtle`'s debug assertions branch on secret data and the
+    // library targets release builds, so a debug build must never be what gets shipped
+    // or what the IDE runs by default. Ask for one explicitly with
+    // `-Pqualia2fa.jvm.variant=debug` when you actually want it.
+    jvmVariant = Variant((findProperty("qualia2fa.jvm.variant") ?: "release").toString())
 
     builds.jvm {
         // Only the host's Rust target is embedded: the Windows desktop build loads the
