@@ -120,6 +120,23 @@ fun JoinAccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            OutlinedButton(onClick = {
+                val image = pickGrayImage()
+                if (image == null) {
+                    message = "没有读到图片（取消，或者文件无法解码）。"
+                } else {
+                    val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
+                    if (read == null) {
+                        message = "这张图片里没有可读的应答。"
+                    } else {
+                        replyText = read
+                        message = "已从图片读入应答。"
+                    }
+                }
+            }) {
+                Text("从图片读取应答")
+            }
+
             Button(
                 onClick = {
                     val current = joiner

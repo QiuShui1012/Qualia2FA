@@ -123,6 +123,9 @@ fun PairNewDeviceScreen(
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
+            remember(reply) { Qualia.qrImage(reply) }?.let { code ->
+                QrCodeView(code)
+            }
             Text(reply, style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = {
                 clipboard.setText(AnnotatedString(reply))
