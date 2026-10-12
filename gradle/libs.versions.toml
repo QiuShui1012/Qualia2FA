@@ -1,0 +1,17 @@
+# Versions are pinned deliberately: Gobley 0.3.7 is the newest release (2025-10-08)
+# and it generates bindings against UniFFI 0.29.4, so the Kotlin toolchain stays on
+# the versions Gobley was built and tested with (Kotlin 2.1.21 / Gradle 8.14.x).
+[versions]
+kotlin = "2.1.21"
+compose = "1.8.2"
+gobley = "0.3.7"
+
+[libraries]
+
+[plugins]
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlinComposeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinAtomicfu = { id = "org.jetbrains.kotlin.plugin.atomicfu", version.ref = "kotlin" }
+composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
+gobleyCargo = { id = "dev.gobley.cargo", version.ref = "gobley" }
+gobleyUniffi = { id = "dev.gobley.uniffi", version.ref = "gobley" }
