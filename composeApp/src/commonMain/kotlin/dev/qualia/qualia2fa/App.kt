@@ -208,6 +208,7 @@ private fun VaultScreen(
     var entries by remember { mutableStateOf(vault.entries()) }
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Entry?>(null) }
+    var pairing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf<String?>(null) }
@@ -247,6 +248,7 @@ private fun VaultScreen(
         )
 
         TextButton(onClick = { adding = true }) { Text("添加条目") }
+        TextButton(onClick = { pairing = true }) { Text("配对新设备") }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -269,6 +271,10 @@ private fun VaultScreen(
                 )
             }
         }
+    }
+
+    if (pairing) {
+        PairNewDeviceScreen(vault = vault, onDone = { pairing = false })
     }
 
     if (adding || editing != null) {
