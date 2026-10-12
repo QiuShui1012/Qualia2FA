@@ -46,7 +46,10 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
   because the tombstone reaches every device the account syncs with
 - **Codes**: live display, countdown ring, one-click copy (the clipboard is cleared again
-  after 30 seconds, and only if it still holds what was copied)
+  after 30 seconds, and only if it still holds what was copied). All three HMAC algorithms are
+  supported — SHA-1, SHA-256 and SHA-512 — chosen in the entry editor and carried in from the
+  `algorithm` parameter when a link or a QR code is imported (SHA-1 being what the
+  `otpauth://` scheme itself means when it says nothing)
 - **Pairing**: started from the sync screen; a pairing code can be drawn as a QR code and
   read back out of an image, and the text always stays underneath the code
 - **Syncing**: two devices show one code each, one direction at a time; wherever the two

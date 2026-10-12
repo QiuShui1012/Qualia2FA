@@ -45,7 +45,7 @@ class SyncTest {
 
     private fun addEntry(vault: Vault, name: String, updatedAt: Long = 1_700_000_000L): String =
         assertNotNull(
-            vault.addEntry(name, "ACME", "alice", secret, 6, 30, "", updatedAt),
+            vault.addEntry(name, "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", updatedAt),
             "adding an entry must succeed",
         )
 
@@ -101,7 +101,7 @@ class SyncTest {
 
         val edited = 1_700_000_120L
         assertTrue(
-            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, 6, 30, "", edited),
+            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", edited),
             "the edit must be accepted",
         )
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L), "the deletion must be accepted")
@@ -162,7 +162,7 @@ class SyncTest {
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 
-        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, 6, 30, "", 1_700_000_120L))
+        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_120L))
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 

@@ -74,6 +74,7 @@
     <string name="field_issuer">服务</string>
     <string name="field_account">账号</string>
     <string name="field_secret">种子（Base32）</string>
+    <string name="field_algorithm">算法</string>
     <string name="field_digits">位数</string>
     <string name="field_period">周期（秒）</string>
     <string name="action_generate_secret">生成随机种子</string>

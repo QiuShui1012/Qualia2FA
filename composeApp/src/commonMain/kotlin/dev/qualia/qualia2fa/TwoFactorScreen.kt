@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -66,6 +67,7 @@ import dev.qualia.qualia2fa.resources.error_image_has_no_entry
 import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.error_link_rejected
 import dev.qualia.qualia2fa.resources.field_account
+import dev.qualia.qualia2fa.resources.field_algorithm
 import dev.qualia.qualia2fa.resources.field_digits
 import dev.qualia.qualia2fa.resources.field_issuer
 import dev.qualia.qualia2fa.resources.field_name
@@ -164,6 +166,9 @@ fun TwoFactorScreen(
                 issuer = link.issuer,
                 account = link.account,
                 secretBase32 = link.secretBase32,
+                // The link's own algorithm, not this application's default: a SHA-256 link
+                // imported as SHA-1 would produce codes that look right and never work.
+                algorithm = link.algorithm,
                 digits = link.digits,
                 periodSeconds = link.periodSeconds,
                 note = "",
@@ -354,7 +359,7 @@ fun TwoFactorScreen(
                 adding = false
                 editing = null
             },
-            onSave = { name, issuer, account, secret, digits, period ->
+            onSave = { name, issuer, account, secret, algorithm, digits, period ->
                 val accepted =
                     if (beingEdited == null) {
                         vault.addEntry(
@@ -362,6 +367,7 @@ fun TwoFactorScreen(
                             issuer = issuer,
                             account = account,
                             secretBase32 = secret,
+                            algorithm = algorithm,
                             digits = digits,
                             periodSeconds = period,
                             note = "",
@@ -374,6 +380,7 @@ fun TwoFactorScreen(
                             issuer = issuer,
                             account = account,
                             secretBase32 = secret,
+                            algorithm = algorithm,
                             digits = digits,
                             periodSeconds = period,
                             note = beingEdited.note,
@@ -457,6 +464,11 @@ private fun EntryCard(
                     listOfNotNull(
                         entry.issuer.takeIf { it.isNotBlank() },
                         entry.account.takeIf { it.isNotBlank() },
+                        // Shown only when it is not the default: a SHA-1 entry is what the
+                        // scheme assumes, and saying so on every row would be noise. A
+                        // SHA-256 row says so, because that is the answer to "why is this
+                        // code rejected".
+                        entry.algorithm.takeIf { it != OtpAlgorithm.Sha1 }?.label,
                     )
                 if (subtitle.isNotEmpty()) {
                     Text(subtitle.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
@@ -543,12 +555,13 @@ private fun EntryDialog(
     initial: Entry?,
     defaultName: String,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, Int, Long) -> Unit,
+    onSave: (String, String, String, String, OtpAlgorithm, Int, Long) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var issuer by remember { mutableStateOf(initial?.issuer.orEmpty()) }
     var account by remember { mutableStateOf(initial?.account.orEmpty()) }
     var secret by remember { mutableStateOf(initial?.secretBase32.orEmpty()) }
+    var algorithm by remember { mutableStateOf(initial?.algorithm ?: OtpAlgorithm.Sha1) }
     var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
     var period by remember { mutableStateOf((initial?.periodSeconds ?: 30L).toString()) }
 
@@ -580,6 +593,18 @@ private fun EntryDialog(
                     label = { Text(stringResource(Res.string.field_secret)) },
                     singleLine = true,
                 )
+                // All three are shown at once: a user reading the algorithm off a server's
+                // setup page should find it without opening anything.
+                Text(stringResource(Res.string.field_algorithm), style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                    OtpAlgorithm.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == algorithm,
+                            onClick = { algorithm = option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
                     OutlinedTextField(
                         value = digits,
@@ -609,6 +634,7 @@ private fun EntryDialog(
                         issuer,
                         account,
                         secret.trim().uppercase(),
+                        algorithm,
                         digits.toIntOrNull() ?: 6,
                         period.toLongOrNull() ?: 30L,
                     )

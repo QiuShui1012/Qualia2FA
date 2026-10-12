@@ -90,6 +90,7 @@ class QualiaTest {
                     issuer = link.issuer,
                     account = link.account,
                     secretBase32 = link.secretBase32,
+                    algorithm = link.algorithm,
                     digits = link.digits,
                     periodSeconds = link.periodSeconds,
                     note = "",

@@ -57,6 +57,35 @@ interface MasterKeyStore {
 }
 
 /**
+ * The HMAC algorithm an entry's codes are computed with.
+ *
+ * [label] is what the interface shows and what an `otpauth://` link carries. Both are the
+ * RFC's own names, so they read the same in every language and are not translated: a user
+ * comparing the application against a server's setup page has to see the same three strings
+ * on both.
+ */
+enum class OtpAlgorithm {
+    /** HMAC-SHA-1, the default the `otpauth://` scheme assumes when it says nothing. */
+    Sha1,
+
+    /** HMAC-SHA-256. */
+    Sha256,
+
+    /** HMAC-SHA-512. */
+    Sha512,
+    ;
+
+    /** The name shown in the interface, which is the name a link carries. */
+    val label: String
+        get() =
+            when (this) {
+                Sha1 -> "SHA-1"
+                Sha256 -> "SHA-256"
+                Sha512 -> "SHA-512"
+            }
+}
+
+/**
  * One entry, as the user interface sees it.
  *
  * A plain Kotlin value: no generated type crosses this boundary.
@@ -67,6 +96,7 @@ data class Entry(
     val issuer: String,
     val account: String,
     val secretBase32: String,
+    val algorithm: OtpAlgorithm,
     val digits: Int,
     val periodSeconds: Long,
     val counter: Long?,
@@ -104,12 +134,17 @@ class Vault internal constructor(private val inner: FfiVault) {
     /**
      * Adds an entry and returns its identifier, or `null` when the secret or the
      * parameters are rejected.
+     *
+     * [algorithm] is required rather than defaulted: a default here would be the one place a
+     * SHA-256 link could quietly become a SHA-1 entry, and the codes would be wrong rather
+     * than missing.
      */
     fun addEntry(
         name: String,
         issuer: String,
         account: String,
         secretBase32: String,
+        algorithm: OtpAlgorithm,
         digits: Int,
         periodSeconds: Long,
         note: String,
@@ -117,7 +152,7 @@ class Vault internal constructor(private val inner: FfiVault) {
     ): String? =
         try {
             inner.addEntry(
-                buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, digits, periodSeconds, note),
+                buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note),
                 unixTime.toULong(),
             )
         } catch (_: Exception) {
@@ -136,6 +171,7 @@ class Vault internal constructor(private val inner: FfiVault) {
         issuer: String,
         account: String,
         secretBase32: String,
+        algorithm: OtpAlgorithm,
         digits: Int,
         periodSeconds: Long,
         note: String,
@@ -143,7 +179,7 @@ class Vault internal constructor(private val inner: FfiVault) {
     ): Boolean =
         try {
             inner.updateEntry(
-                buildEntry(id, name, issuer, account, secretBase32, digits, periodSeconds, note),
+                buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note),
                 unixTime.toULong(),
             )
             true
@@ -218,6 +254,7 @@ private fun buildEntry(
     issuer: String,
     account: String,
     secretBase32: String,
+    algorithm: OtpAlgorithm,
     digits: Int,
     periodSeconds: Long,
     note: String,
@@ -228,7 +265,7 @@ private fun buildEntry(
         issuer = issuer.ifBlank { null },
         account = account,
         secretBase32 = secretBase32,
-        algorithm = FfiAlgorithm.SHA1,
+        algorithm = algorithm.toFfi(),
         digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
         period = periodSeconds.toULong(),
         counter = null,
@@ -244,11 +281,27 @@ private fun FfiVaultEntry.toEntry(): Entry =
         issuer = issuer.orEmpty(),
         account = account,
         secretBase32 = secretBase32,
+        algorithm = algorithm.toFacade(),
         digits = if (digits == FfiDigits.EIGHT) 8 else 6,
         periodSeconds = period.toLong(),
         counter = counter?.toLong(),
         note = note,
     )
+
+/** The two enums name the same three algorithms; the mapping is the whole contract. */
+private fun OtpAlgorithm.toFfi(): FfiAlgorithm =
+    when (this) {
+        OtpAlgorithm.Sha1 -> FfiAlgorithm.SHA1
+        OtpAlgorithm.Sha256 -> FfiAlgorithm.SHA256
+        OtpAlgorithm.Sha512 -> FfiAlgorithm.SHA512
+    }
+
+private fun FfiAlgorithm.toFacade(): OtpAlgorithm =
+    when (this) {
+        FfiAlgorithm.SHA1 -> OtpAlgorithm.Sha1
+        FfiAlgorithm.SHA256 -> OtpAlgorithm.Sha256
+        FfiAlgorithm.SHA512 -> OtpAlgorithm.Sha512
+    }
 
 /**
  * The narrow facade over the generated UniFFI bindings.
@@ -271,19 +324,27 @@ object Qualia {
     /** A fresh Base32 secret, drawn from the platform random number generator. */
     fun newSecret(): String = ffiGenerateSecretBase32()
 
-    /** The RFC 6238 code for [secretBase32] at [unixTime], or `null` on invalid input. */
+    /**
+     * The RFC 6238 code for [secretBase32] at [unixTime], or `null` on invalid input.
+     *
+     * A stateless convenience, used by the tests as a second opinion on what a vault computes.
+     * [algorithm] defaults to SHA-1 because that is the scheme's own default — what an
+     * `otpauth://` link means when it names none — and not because the others are less
+     * supported.
+     */
     fun totp(
         secretBase32: String,
         unixTime: Long,
         periodSeconds: Long = 30,
         digits: Int = 6,
+        algorithm: OtpAlgorithm = OtpAlgorithm.Sha1,
     ): String? =
         try {
             ffiTotpCode(
                 secretBase32 = secretBase32,
                 unixTime = unixTime.toULong(),
                 period = periodSeconds.toULong(),
-                algorithm = FfiAlgorithm.SHA1,
+                algorithm = algorithm.toFfi(),
                 digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
             )
         } catch (_: Exception) {
@@ -386,19 +447,20 @@ object Qualia {
      * The entry's display name is the caller's to choose: the link carries an issuer and
      * an account, not a name.
      */
-    fun parseOtpAuth(uri: String): OtpAuthLink? =
-        try {
-            val parsed = ffiParseOtpAuthUri(uri)
-            OtpAuthLink(
-                issuer = parsed.issuer.orEmpty(),
-                account = parsed.account,
-                secretBase32 = parsed.secretBase32,
-                digits = if (parsed.digits == FfiDigits.EIGHT) 8 else 6,
-                periodSeconds = parsed.period.toLong(),
-            )
-        } catch (_: Exception) {
-            null
-        }
+        fun parseOtpAuth(uri: String): OtpAuthLink? =
+            try {
+                val parsed = ffiParseOtpAuthUri(uri)
+                OtpAuthLink(
+                    issuer = parsed.issuer.orEmpty(),
+                    account = parsed.account,
+                    secretBase32 = parsed.secretBase32,
+                    algorithm = parsed.algorithm.toFacade(),
+                    digits = if (parsed.digits == FfiDigits.EIGHT) 8 else 6,
+                    periodSeconds = parsed.period.toLong(),
+                )
+            } catch (_: Exception) {
+                null
+            }
 
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32
@@ -917,6 +979,12 @@ data class OtpAuthLink(
     val issuer: String,
     val account: String,
     val secretBase32: String,
+    /**
+     * The algorithm the link names, which is SHA-1 when it names none — the scheme's own
+     * default. It is carried into the entry: importing a SHA-256 link as a SHA-1 entry would
+     * produce codes that look right and are always wrong.
+     */
+    val algorithm: OtpAlgorithm,
     val digits: Int,
     val periodSeconds: Long,
 )

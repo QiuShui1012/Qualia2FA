@@ -81,6 +81,7 @@
     <string name="field_issuer">Service</string>
     <string name="field_account">Account</string>
     <string name="field_secret">Secret (Base32)</string>
+    <string name="field_algorithm">Algorithm</string>
     <string name="field_digits">Digits</string>
     <string name="field_period">Period (seconds)</string>
     <string name="action_generate_secret">Generate a random secret</string>

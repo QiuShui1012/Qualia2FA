@@ -65,7 +65,7 @@ class VaultTest {
         }
 
         val hostVault = registration.vault
-        assertNotNull(hostVault.addEntry("Shared", "Example", "", secret, 6, 30, "", 1_700_000_000))
+        assertNotNull(hostVault.addEntry("Shared", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
         val hostVaultFile = assertNotNull(hostVault.serialize())
 
         val host = assertNotNull(Qualia.beginPairing(), "the host side must start")
@@ -138,6 +138,7 @@ class VaultTest {
                 issuer = "Example",
                 account = "alice@example.com",
                 secretBase32 = secret,
+                algorithm = OtpAlgorithm.Sha1,
                 digits = 6,
                 periodSeconds = 30,
                 note = "",
@@ -161,12 +162,12 @@ class VaultTest {
     fun editingKeepsTheIdentifierAndChangesTheCode() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        val id = assertNotNull(vault.addEntry("Test", "", "", secret, 6, 30, "", 1_700_000_000))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
         val before = vault.code(id, 59)
 
         val other = "MZXW6YTBOI======"
         assertTrue(
-            vault.updateEntry(id, "Renamed", "Issuer", "", other, 6, 30, "", 1_700_000_001),
+            vault.updateEntry(id, "Renamed", "Issuer", "", other, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_001),
             "editing must succeed",
         )
 
@@ -182,9 +183,9 @@ class VaultTest {
     fun editingARejectedSecretChangesNothing() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        val id = assertNotNull(vault.addEntry("Test", "", "", secret, 6, 30, "", 1_700_000_000))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
 
-        assertTrue(!vault.updateEntry(id, "Bad", "", "", "not base32!", 6, 30, "", 1_700_000_001))
+        assertTrue(!vault.updateEntry(id, "Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_001))
         assertEquals("Test", assertNotNull(vault.entries().firstOrNull()).name)
     }
 
@@ -197,7 +198,7 @@ class VaultTest {
     fun aRecoveryFileRestoresTheKeyThatOpensTheVault() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        assertNotNull(vault.addEntry("Test", "Example", "", secret, 6, 30, "", 1_700_000_000))
+        assertNotNull(vault.addEntry("Test", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
         val vaultData = assertNotNull(vault.serialize())
 
         val file = assertNotNull(vault.recoveryFile("correct horse battery staple"), "exporting must succeed")
@@ -239,7 +240,7 @@ class VaultTest {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
         val id = assertNotNull(
-            vault.addEntry("Test", "", "", secret, 6, 30, "", 1_700_000_000),
+            vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000),
         )
 
         assertTrue(vault.removeEntry(id, 1_700_000_001), "removing an entry must report success")
@@ -253,7 +254,7 @@ class VaultTest {
         val vault = assertNotNull(Qualia.createLocalVault(store))
 
         assertNull(
-            vault.addEntry("Bad", "", "", "not base32!", 6, 30, "", 1_700_000_000),
+            vault.addEntry("Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000),
             "an invalid secret must be rejected rather than stored",
         )
         assertEquals(0, vault.entryCount)
