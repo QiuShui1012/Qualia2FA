@@ -6,8 +6,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import dev.qualia.qualia2fa.resources.Res
+import dev.qualia.qualia2fa.resources.qualia2fa_logo
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * The desktop entry point.
@@ -18,9 +21,16 @@ import java.awt.event.WindowFocusListener
  *
  * Losing focus locks the vault. The window is the only place that can know about it, so
  * it counts the events and the interface reacts.
+ *
+ * The window icon is the same mark the interface shows, so the taskbar entry, the
+ * Alt-Tab switcher and the window itself are recognizably one application.
  */
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "Qualia2FA") {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Qualia2FA",
+        icon = painterResource(Res.drawable.qualia2fa_logo),
+    ) {
         var blurCount by remember { mutableStateOf(0) }
 
         val window = window

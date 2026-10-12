@@ -1,5 +1,7 @@
 # Qualia2FA
 
+![Qualia2FA](composeApp/src/commonMain/composeResources/drawable/qualia2fa_logo.svg)
+
 一个**无中心服务器、不实时同步**的多平台双因素认证（2FA）应用。
 
 English version: [README.en.md](README.en.md).

@@ -1,5 +1,6 @@
 package dev.qualia.qualia2fa
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,8 +81,10 @@ import dev.qualia.qualia2fa.resources.first_run_join_explainer
 import dev.qualia.qualia2fa.resources.first_run_no_hardware_warning
 import dev.qualia.qualia2fa.resources.message_copied_and_cleared
 import dev.qualia.qualia2fa.resources.message_entry_imported
+import dev.qualia.qualia2fa.resources.qualia2fa_logo
 import dev.qualia.qualia2fa.resources.settings_language
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -243,6 +247,13 @@ private fun FirstRunScreen(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // The mark carries no information of its own here: the name is right below it, so it
+        // is decoration and stays out of the accessibility tree.
+        Image(
+            painter = painterResource(Res.drawable.qualia2fa_logo),
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+        )
         Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.headlineMedium)
         Text(
             stringResource(Res.string.core_version_in_status, Qualia.coreVersion(), status.text()),
@@ -355,6 +366,12 @@ private fun VaultScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(Res.drawable.qualia2fa_logo),
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.width(8.dp))
             Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.width(12.dp))
             Text(
