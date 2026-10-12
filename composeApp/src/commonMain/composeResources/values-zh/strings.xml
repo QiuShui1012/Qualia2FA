@@ -8,35 +8,46 @@
 <resources>
     <string name="app_name">Qualia2FA</string>
 
-    <!-- 首次运行 -->
-    <string name="first_run_intro">这台设备上还没有保险库。创建之后，条目只保存在本机，验证码离线可算。</string>
-    <string name="first_run_no_hardware_warning">注意：本机没有接上硬件密钥库，主密钥将写在一个只有你的操作系统账户能读的文件里。继续即表示你接受这一点；TPM 支持尚未接上。</string>
-    <string name="first_run_join_explainer">登录会从一台已解锁的设备取得主密钥：那台设备显示配对码，本机用它生成请求，对方确认后把应答交回来。主密钥由二维码这一层带外传递，不经过任何服务器。</string>
+    <!-- 导航 -->
+    <string name="nav_two_factor">2FA</string>
+    <string name="nav_sync">同步</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- 加载 -->
+    <string name="cd_loading">正在加载</string>
+
+    <!-- 登录：首次运行，或者保险库已锁定 -->
+    <string name="login_subtitle">开始使用</string>
     <string name="action_create_vault">创建保险库</string>
     <string name="action_join_existing_account">登录到已有账号</string>
+    <string name="action_unlock">解锁</string>
+    <string name="first_run_intro">这台设备上还没有保险库。创建之后，条目只保存在本机，验证码离线可算。</string>
+    <string name="first_run_no_hardware_warning">注意：本机没有接上硬件密钥库，主密钥将写在一个只有你的操作系统账户能读的文件里。继续即表示你接受这一点；TPM 支持尚未接上。</string>
+    <string name="first_run_join_explainer">登录会从一台已解锁的设备取得主密钥：那台设备显示一个码，本机用它生成请求，对方确认后把应答交回来。主密钥由这个码带外传递，不经过任何服务器。</string>
+    <string name="login_locked_explainer">保险库已锁定。解锁会重新从平台密钥库取出主密钥，不需要输入任何密码。</string>
+    <string name="login_key_unreadable">这台设备上有一把现在读不出来的主密钥。在这里创建新保险库会顶掉它，里面的条目会一起丢失——先试试在另一台设备上用恢复密钥。</string>
+    <string name="login_vault_missing">这台设备上有一把主密钥，但保险库文件不在了。从同一账号的另一台设备登录可以把条目带回来；在这里创建保险库会换一把新密钥，把本机从这个账号里切出去。</string>
+    <string name="error_serialize_failed">创建失败：核心无法序列化保险库</string>
+    <string name="error_no_platform_key_store">创建失败：平台密钥库不可用，核心也拒绝了本机保险库</string>
 
-    <!-- 状态行 -->
-    <string name="status_opening_vault">正在打开本机保险库…</string>
-    <string name="status_unlocked">已解锁</string>
+    <!-- 锁定 -->
     <string name="status_locked">已锁定</string>
     <string name="status_locked_on_blur">窗口失去焦点，已锁定</string>
     <string name="status_locked_on_timeout">超过 %1$d 秒未解锁，已锁定</string>
-    <string name="status_joined">已通过配对登录</string>
-    <string name="status_created_hardware">设备身份在 %1$s 里（硬件保护）</string>
-    <string name="status_created_software">设备身份在 %1$s 里（非硬件保护）</string>
-    <string name="status_local_vault">本机保险库（无设备身份，不能配对或同步）</string>
-    <string name="core_version_in_status">核心库 %1$s（%2$s）</string>
-    <string name="core_version_hardware_key">核心库 %1$s；主密钥存放在硬件密钥库中。</string>
-    <string name="core_version_file_key">核心库 %1$s；主密钥存放在本机文件里（非硬件保护）。</string>
 
-    <!-- 条目列表 -->
-    <plurals name="entry_count">
-        <item quantity="other">%1$d 条</item>
-    </plurals>
-    <string name="action_lock">锁定</string>
-    <string name="action_add_entry">添加条目</string>
-    <string name="action_import_entry_from_image">扫码导入条目</string>
-    <string name="action_pair_new_device">配对新设备</string>
+    <!-- 2FA 界面 -->
+    <string name="two_factor_empty">还没有条目。点 + 扫描二维码，或者手动输入种子。</string>
+    <string name="menu_scan_code">扫描二维码</string>
+    <string name="menu_enter_manually">手动输入</string>
+    <string name="cd_add_entry">添加条目</string>
+    <string name="cd_enter_selection">选择条目</string>
+    <string name="cd_selection_all">全选</string>
+    <string name="cd_selection_none">取消全选</string>
+    <string name="selection_count">已选 %1$d 项</string>
+    <string name="action_delete_selected">删除</string>
+    <string name="dialog_delete_selected_title">删除这 %1$d 条条目？</string>
+    <string name="dialog_delete_selected_text">这个账号同步过的每台设备都会一起删掉它们，条目删掉之后验证码就找不回来了。</string>
+    <string name="message_entries_deleted">已删除 %1$d 条条目。</string>
     <string name="action_copy">复制</string>
     <string name="action_edit">编辑</string>
     <string name="action_delete">删除</string>
@@ -44,9 +55,10 @@
     <string name="action_cancel">取消</string>
     <string name="action_back">返回</string>
     <string name="action_done">完成</string>
+    <string name="action_continue">继续</string>
     <string name="code_changes_in">%1$d 秒后更换</string>
-    <string name="message_copied_and_cleared">已复制；30 秒后自动清空剪贴板。</string>
     <string name="message_copied">已复制。</string>
+    <string name="message_copied_and_cleared">已复制；30 秒后自动清空剪贴板。</string>
     <string name="default_entry_name">未命名</string>
     <string name="default_imported_entry_name">导入的条目</string>
 
@@ -67,57 +79,19 @@
     <string name="error_image_has_no_entry">这张图片里没有可读的条目码（需要 otpauth:// 二维码）。</string>
     <string name="error_entry_rejected">条目没有被接受：种子或参数不合法。</string>
     <string name="error_entry_not_saved">没有保存：种子或参数不被接受（种子必须是合法 Base32）</string>
-    <string name="error_serialize_failed">创建失败：核心无法序列化保险库</string>
-    <string name="error_no_platform_key_store">创建失败：平台密钥库不可用，核心也拒绝了本机保险库</string>
 
     <!-- 平台文件对话框 -->
     <string name="dialog_pick_image">选择含有二维码的图片</string>
     <string name="filter_image_files">图片</string>
+    <string name="dialog_save_recovery">保存恢复密钥</string>
+    <string name="dialog_open_recovery">打开恢复密钥文件</string>
+    <string name="filter_recovery_files">恢复密钥文件</string>
 
-    <!-- 配对：主机侧 -->
-    <string name="pair_error_no_key_store">无法开始配对：本机没有可用的平台密钥库。</string>
-    <string name="pair_intro">把下面这段配对码交给新设备（只在这一步有效）。它读完之后会给你一段请求。</string>
-    <string name="action_copy_pairing_code">复制配对码</string>
-    <string name="field_joiner_request">新设备的请求</string>
-    <string name="action_read_request_from_image">从图片读取请求</string>
-    <string name="error_image_has_no_request">这张图片里没有可读的请求。</string>
-    <string name="message_request_read">已从图片读入请求。</string>
-    <string name="pair_error_request_rejected">这段请求不被接受：它可能不是这次配对的请求。</string>
-    <string name="action_authorize_device">授权这台设备（把主密钥交给本次会话）</string>
-    <string name="pair_authorized_with_requester">请求方身份：%1$s。把下面这段应答交给它即可完成；在交出去之前，什么都还没有给它。</string>
-    <string name="pair_authorized">已授权。把下面这段应答交给新设备即可完成。</string>
-    <string name="action_copy_reply">复制应答</string>
-
-    <!-- 配对：加入侧 -->
-    <string name="join_intro">在一台已经解锁的设备上选择「配对新设备」，把那里显示的配对码贴到下面。</string>
-    <string name="field_pairing_code">配对码（来自已解锁的设备）</string>
-    <string name="action_read_pairing_code_from_image">从图片读取配对码</string>
-    <string name="error_image_has_no_pairing_code">这张图片里没有可读的配对码。</string>
-    <string name="message_pairing_code_read">已从图片读入配对码。</string>
-    <string name="join_error_bad_code">这不是一个可用的配对码，或者本机没有可用的平台密钥库。</string>
-    <string name="action_generate_request">生成请求</string>
-    <string name="join_error_request_failed">无法生成请求：平台密钥库拒绝了这次操作。</string>
-    <string name="join_hand_back_request">把下面这段交回给那台设备：</string>
-    <string name="action_copy_request">复制请求</string>
-    <string name="field_reply">应答（来自那台设备）</string>
-    <string name="action_read_reply_from_image">从图片读取应答</string>
-    <string name="error_image_has_no_reply">这张图片里没有可读的应答。</string>
-    <string name="message_reply_read">已从图片读入应答。</string>
-    <string name="join_error_reply_rejected">应答没有通过验证：可能不是这次配对的应答，或者口令/会话对不上。</string>
-    <string name="error_joined_but_not_serialized">加入成功，但保险库无法序列化。</string>
-    <string name="action_complete_login">完成登录</string>
-
-    <!-- 语言 -->
-    <string name="settings_language">语言</string>
-    <string name="language_system">跟随系统语言</string>
-
-    <!-- 同步：两台设备各出一个码，一次一个方向 -->
-    <string name="action_sync">同步</string>
+    <!-- 同步 -->
     <string name="sync_intro">同步用码在两个方向上各走一次：一台设备出示同步码，另一台读入并合并它带来的内容。全程不经过任何服务器，走动的只有那些码。</string>
     <string name="sync_error_no_device_identity">这台设备没有平台身份，无法同步。它当初是以「本机保险库」创建的，不能配对或同步。</string>
     <string name="sync_my_code_explainer">把这个码交给另一台设备。合并之后请重新生成一次：交出去的是生成那一刻的状态。</string>
     <string name="action_generate_code">生成同步码</string>
-    <string name="action_show_my_code">出示我的同步码</string>
     <string name="sync_read_explainer">读入对方的同步码：贴在下面，或者打开它保存成的图片。</string>
     <string name="field_peer_code">对方的同步码</string>
     <string name="action_read_code_from_image">从图片读取同步码</string>
@@ -149,4 +123,69 @@
     <string name="action_keep_deleted">保持删除</string>
     <string name="action_restore_entry">恢复条目</string>
     <string name="sync_error_decision_refused">裁决没能生效，什么都没改动。</string>
+
+    <!-- 配对新设备（在同步界面里） -->
+    <string name="sync_pair_section">添加另一台设备</string>
+    <string name="sync_pair_explainer">对方读过配对码之后会给你一段请求；只有在你确认之后，主密钥才会离开这台设备。</string>
+    <string name="action_pair_new_device">配对新设备</string>
+    <string name="pair_error_no_key_store">无法开始配对：本机没有可用的平台密钥库。</string>
+    <string name="pair_intro">把下面这段配对码交给新设备（只在这一步有效）。它读完之后会给你一段请求。</string>
+    <string name="action_copy_pairing_code">复制配对码</string>
+    <string name="field_joiner_request">新设备的请求</string>
+    <string name="action_read_request_from_image">从图片读取请求</string>
+    <string name="error_image_has_no_request">这张图片里没有可读的请求。</string>
+    <string name="message_request_read">已从图片读入请求。</string>
+    <string name="pair_error_request_rejected">这段请求不被接受：它可能不是这次配对的请求。</string>
+    <string name="action_authorize_device">授权这台设备（把主密钥交给本次会话）</string>
+    <string name="pair_authorized_with_requester">请求方身份：%1$s。把下面这段应答交给它即可完成；在交出去之前，什么都还没有给它。</string>
+    <string name="pair_authorized">已授权。把下面这段应答交给新设备即可完成。</string>
+    <string name="action_copy_reply">复制应答</string>
+
+    <!-- 在新设备上登录 -->
+    <string name="join_intro">在一台已经解锁的设备上选择「配对新设备」，把那里显示的配对码贴到下面。</string>
+    <string name="field_pairing_code">配对码（来自已解锁的设备）</string>
+    <string name="action_read_pairing_code_from_image">从图片读取配对码</string>
+    <string name="error_image_has_no_pairing_code">这张图片里没有可读的配对码。</string>
+    <string name="message_pairing_code_read">已从图片读入配对码。</string>
+    <string name="join_error_bad_code">这不是一个可用的配对码，或者本机没有可用的平台密钥库。</string>
+    <string name="action_generate_request">生成请求</string>
+    <string name="join_error_request_failed">无法生成请求：平台密钥库拒绝了这次操作。</string>
+    <string name="join_hand_back_request">把下面这段交回给那台设备：</string>
+    <string name="action_copy_request">复制请求</string>
+    <string name="field_reply">应答（来自那台设备）</string>
+    <string name="action_read_reply_from_image">从图片读取应答</string>
+    <string name="error_image_has_no_reply">这张图片里没有可读的应答。</string>
+    <string name="message_reply_read">已从图片读入应答。</string>
+    <string name="join_error_reply_rejected">应答没有通过验证：可能不是这次配对的应答，或者口令/会话对不上。</string>
+    <string name="error_joined_but_not_serialized">加入成功，但保险库无法序列化。</string>
+    <string name="action_complete_login">完成登录</string>
+
+    <!-- 设置 -->
+    <string name="settings_language">语言</string>
+    <string name="language_system">跟随系统语言</string>
+    <string name="settings_key_store">主密钥</string>
+    <string name="settings_master_key_hardware">在平台密钥库中，受硬件保护</string>
+    <string name="settings_master_key_file">在本机文件里，仅由你的操作系统账户保护</string>
+    <string name="settings_device_identity">设备身份</string>
+    <string name="settings_no_device_identity">没有：这个保险库不能配对或同步</string>
+    <string name="settings_hardware_backed">硬件保护</string>
+    <string name="settings_software_backed">非硬件保护</string>
+    <string name="settings_core_version">核心库</string>
+    <string name="settings_lock_now">立即锁定</string>
+    <string name="settings_recovery">恢复密钥</string>
+    <string name="settings_recovery_explainer">恢复密钥文件加上你设定的口令，可以在所有设备都丢失时取回主密钥。请离线保管：拿到文件和口令的人就拿到了这个账号。</string>
+    <string name="action_export_recovery">导出恢复密钥…</string>
+    <string name="action_import_recovery">导入恢复密钥…</string>
+    <string name="field_passphrase">口令</string>
+    <string name="field_passphrase_again">再输一次口令</string>
+    <string name="error_passphrase_mismatch">两次输入的口令不一致。</string>
+    <string name="error_recovery_export">恢复密钥没能生成。</string>
+    <string name="error_recovery_save">恢复密钥没能保存。</string>
+    <string name="error_recovery_open">文件没能读取。</string>
+    <string name="error_recovery_rejected">没有被接受：口令不对，或者这不是一个恢复密钥文件。</string>
+    <string name="message_recovery_saved">已保存到 %1$s</string>
+    <string name="dialog_import_recovery_title">替换本机的保险库？</string>
+    <string name="dialog_import_recovery_text">导入恢复密钥会把本机的内容替换成那个账号。只存在于本机的条目不会被合并，会就此丢失。</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_license">应用本体为 Apache-2.0；它所依赖的 Rust 各层为 LGPL-3.0-or-later。</string>
 </resources>

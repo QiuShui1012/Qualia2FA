@@ -3,45 +3,58 @@
   Default locale: English (United States).
 
   Every key in this file is also present in `values-zh/strings.xml`; a translation that
-  is missing falls back to the text here, and `StringsParityTest` fails when the two
-  files disagree on their key sets.
+  is missing falls back to the text here, and `StringsTest` fails when the two files
+  disagree on their key sets.
 
   Placeholders follow the `%1$s` / `%1$d` form of Compose resources, so a translation may
   order them differently.
+
+  The keys are grouped the way the interface is: the loading screen, the login screen, the
+  three main screens (2FA, sync, settings), and the dialogs they open.
 -->
 <resources>
     <string name="app_name">Qualia2FA</string>
 
-    <!-- First run -->
-    <string name="first_run_intro">There is no vault on this device yet. Once you create one, the entries stay here and the codes are computed offline.</string>
-    <string name="first_run_no_hardware_warning">Note: this machine has no platform key store, so the master key will be written to a file that only your operating system account can read. Continuing means you accept that; TPM support is not wired in yet.</string>
-    <string name="first_run_join_explainer">Logging in takes the master key from a device that is already unlocked: that device shows a pairing code, this one turns it into a request, and its reply comes back after the other side confirms. The master key travels out of band, through the code, and never through a server.</string>
+    <!-- Navigation -->
+    <string name="nav_two_factor">2FA</string>
+    <string name="nav_sync">Sync</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Loading -->
+    <string name="cd_loading">Loading</string>
+
+    <!-- Login: first run, or a vault that is locked -->
+    <string name="login_subtitle">Get started</string>
     <string name="action_create_vault">Create a vault</string>
     <string name="action_join_existing_account">Log in to an existing account</string>
+    <string name="action_unlock">Unlock</string>
+    <string name="first_run_intro">There is no vault on this device yet. Creating one keeps the entries here, and the codes are computed offline.</string>
+    <string name="first_run_no_hardware_warning">Note: this machine has no platform key store, so the master key will be written to a file that only your operating system account can read. Continuing means you accept that; TPM support is not wired in yet.</string>
+    <string name="first_run_join_explainer">Logging in takes the master key from a device that is already unlocked: that device shows a code, this one turns it into a request, and the reply comes back after the other side confirms. The master key travels out of band, through the code, and never through a server.</string>
+    <string name="login_locked_explainer">The vault is locked. Unlocking takes the master key out of the platform key store again; there is no password to type.</string>
+    <string name="login_key_unreadable">This device holds a master key that cannot be read right now. Creating a new vault here would replace it and its entries would be lost, so do not do that before trying the recovery key on another device.</string>
+    <string name="login_vault_missing">This device holds a master key, but its vault file is gone. Logging in from another device of the same account brings the entries back; creating a vault here would draw a new key and cut this device off from the account.</string>
+    <string name="error_serialize_failed">Creation failed: the core cannot serialize the vault.</string>
+    <string name="error_no_platform_key_store">Creation failed: the platform key store is unavailable, and the core refused a local-only vault as well.</string>
 
-    <!-- Status line -->
-    <string name="status_opening_vault">Opening the local vault…</string>
-    <string name="status_unlocked">Unlocked</string>
+    <!-- Lock -->
     <string name="status_locked">Locked</string>
     <string name="status_locked_on_blur">The window lost focus, so the vault was locked</string>
     <string name="status_locked_on_timeout">Locked after %1$d seconds without activity</string>
-    <string name="status_joined">Logged in through pairing</string>
-    <string name="status_created_hardware">Device identity is in %1$s (hardware protected)</string>
-    <string name="status_created_software">Device identity is in %1$s (not hardware protected)</string>
-    <string name="status_local_vault">Local-only vault (no device identity, so it cannot pair or sync)</string>
-    <string name="core_version_in_status">Core library %1$s (%2$s)</string>
-    <string name="core_version_hardware_key">Core library %1$s; the master key is held by the hardware key store.</string>
-    <string name="core_version_file_key">Core library %1$s; the master key is held in a file on this device (not hardware protected).</string>
 
-    <!-- Entry list -->
-    <plurals name="entry_count">
-        <item quantity="one">%1$d entry</item>
-        <item quantity="other">%1$d entries</item>
-    </plurals>
-    <string name="action_lock">Lock</string>
-    <string name="action_add_entry">Add an entry</string>
-    <string name="action_import_entry_from_image">Import an entry from an image</string>
-    <string name="action_pair_new_device">Pair a new device</string>
+    <!-- The 2FA screen -->
+    <string name="two_factor_empty">No entries yet. Use + to scan a QR code or to enter a secret by hand.</string>
+    <string name="menu_scan_code">Scan a QR code</string>
+    <string name="menu_enter_manually">Enter it by hand</string>
+    <string name="cd_add_entry">Add an entry</string>
+    <string name="cd_enter_selection">Select entries</string>
+    <string name="cd_selection_all">Select all</string>
+    <string name="cd_selection_none">Clear the selection</string>
+    <string name="selection_count">%1$d selected</string>
+    <string name="action_delete_selected">Delete</string>
+    <string name="dialog_delete_selected_title">Delete %1$d entries?</string>
+    <string name="dialog_delete_selected_text">Every device this account syncs with deletes them too, and a code cannot be recovered once the entry is gone.</string>
+    <string name="message_entries_deleted">%1$d entries deleted.</string>
     <string name="action_copy">Copy</string>
     <string name="action_edit">Edit</string>
     <string name="action_delete">Delete</string>
@@ -49,14 +62,16 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_back">Back</string>
     <string name="action_done">Done</string>
+    <string name="action_continue">Continue</string>
     <string name="code_changes_in">Changes in %1$d s</string>
-    <string name="message_copied_and_cleared">Copied; the clipboard is cleared again after 30 seconds.</string>
     <string name="message_copied">Copied.</string>
+    <string name="message_copied_and_cleared">Copied; the clipboard is cleared again after 30 seconds.</string>
     <string name="default_entry_name">Untitled</string>
     <string name="default_imported_entry_name">Imported entry</string>
 
-    <!-- Entry editor -->
-    <string name="dialog_add_entry">Add an entry</string>    <string name="dialog_edit_entry">Edit the entry</string>
+    <!-- The entry editor -->
+    <string name="dialog_add_entry">Add an entry</string>
+    <string name="dialog_edit_entry">Edit the entry</string>
     <string name="field_name">Name</string>
     <string name="field_issuer">Service</string>
     <string name="field_account">Account</string>
@@ -71,57 +86,19 @@
     <string name="error_image_has_no_entry">This image holds no readable entry code (an otpauth:// QR code is expected).</string>
     <string name="error_entry_rejected">The entry was not accepted: the secret or the parameters are not valid.</string>
     <string name="error_entry_not_saved">Nothing was saved: the secret or the parameters are not accepted (the secret must be valid Base32).</string>
-    <string name="error_serialize_failed">Creation failed: the core cannot serialize the vault.</string>
-    <string name="error_no_platform_key_store">Creation failed: the platform key store is unavailable, and the core refused a local-only vault as well.</string>
 
     <!-- The platform file dialog -->
     <string name="dialog_pick_image">Choose an image holding a QR code</string>
     <string name="filter_image_files">Images</string>
+    <string name="dialog_save_recovery">Save the recovery key</string>
+    <string name="dialog_open_recovery">Open a recovery key file</string>
+    <string name="filter_recovery_files">Recovery key files</string>
 
-    <!-- Pairing, host side -->
-    <string name="pair_error_no_key_store">Pairing cannot start: this machine has no usable platform key store.</string>
-    <string name="pair_intro">Hand the pairing code below to the new device (it is valid for this step only). Once it has read the code, it gives you a request.</string>
-    <string name="action_copy_pairing_code">Copy the pairing code</string>
-    <string name="field_joiner_request">The request from the new device</string>
-    <string name="action_read_request_from_image">Read the request from an image</string>
-    <string name="error_image_has_no_request">This image holds no readable request.</string>
-    <string name="message_request_read">The request was read from the image.</string>
-    <string name="pair_error_request_rejected">This request is not accepted: it may not belong to this pairing.</string>
-    <string name="action_authorize_device">Authorize this device (hand the master key to this session)</string>
-    <string name="pair_authorized_with_requester">Requester identity: %1$s. Hand the reply below to it to finish; nothing has been given to it before that.</string>
-    <string name="pair_authorized">Authorized. Hand the reply below to the new device to finish.</string>
-    <string name="action_copy_reply">Copy the reply</string>
-
-    <!-- Pairing, joining side -->
-    <string name="join_intro">On a device that is already unlocked, choose “Pair a new device”, then paste the pairing code it shows below.</string>
-    <string name="field_pairing_code">Pairing code (from the unlocked device)</string>
-    <string name="action_read_pairing_code_from_image">Read the pairing code from an image</string>
-    <string name="error_image_has_no_pairing_code">This image holds no readable pairing code.</string>
-    <string name="message_pairing_code_read">The pairing code was read from the image.</string>
-    <string name="join_error_bad_code">This is not a usable pairing code, or this machine has no usable platform key store.</string>
-    <string name="action_generate_request">Generate the request</string>
-    <string name="join_error_request_failed">The request cannot be generated: the platform key store refused the operation.</string>
-    <string name="join_hand_back_request">Hand the text below back to that device:</string>
-    <string name="action_copy_request">Copy the request</string>
-    <string name="field_reply">Reply (from that device)</string>
-    <string name="action_read_reply_from_image">Read the reply from an image</string>
-    <string name="error_image_has_no_reply">This image holds no readable reply.</string>
-    <string name="message_reply_read">The reply was read from the image.</string>
-    <string name="join_error_reply_rejected">The reply did not verify: it may not belong to this pairing, or the passphrase or the session does not match.</string>
-    <string name="error_joined_but_not_serialized">Login succeeded, but the vault cannot be serialized.</string>
-    <string name="action_complete_login">Finish the login</string>
-
-    <!-- Language -->
-    <string name="settings_language">Language</string>
-    <string name="language_system">Follow the system language</string>
-
-    <!-- Sync: both devices exchange codes, one direction at a time -->
-    <string name="action_sync">Sync</string>
+    <!-- Sync -->
     <string name="sync_intro">Syncing moves codes in both directions: one device shows a code, the other reads it and merges what it carries. Nothing goes through a server, and the codes are the only thing that travels.</string>
     <string name="sync_error_no_device_identity">This device has no platform identity, so it cannot sync. It was created as a local-only vault, which cannot pair or sync.</string>
     <string name="sync_my_code_explainer">Hand this code to the other device. After a merge, generate it again: what you hand over is the state at the moment it was generated.</string>
     <string name="action_generate_code">Generate the code</string>
-    <string name="action_show_my_code">Show my sync code</string>
     <string name="sync_read_explainer">Read the other device's code: paste it below, or open the image it was saved as.</string>
     <string name="field_peer_code">The other device's sync code</string>
     <string name="action_read_code_from_image">Read the code from an image</string>
@@ -153,4 +130,69 @@
     <string name="action_keep_deleted">Keep it deleted</string>
     <string name="action_restore_entry">Restore the entry</string>
     <string name="sync_error_decision_refused">The decision could not be applied, so nothing was changed.</string>
+
+    <!-- Pairing a new device, from the sync screen -->
+    <string name="sync_pair_section">Add another device</string>
+    <string name="sync_pair_explainer">The other device shows a request after reading the pairing code; the master key leaves this device only when you confirm.</string>
+    <string name="action_pair_new_device">Pair a new device</string>
+    <string name="pair_error_no_key_store">Pairing cannot start: this machine has no usable platform key store.</string>
+    <string name="pair_intro">Hand the pairing code below to the new device (it is valid for this step only). Once it has read the code, it gives you a request.</string>
+    <string name="action_copy_pairing_code">Copy the pairing code</string>
+    <string name="field_joiner_request">The request from the new device</string>
+    <string name="action_read_request_from_image">Read the request from an image</string>
+    <string name="error_image_has_no_request">This image holds no readable request.</string>
+    <string name="message_request_read">The request was read from the image.</string>
+    <string name="pair_error_request_rejected">This request is not accepted: it may not belong to this pairing.</string>
+    <string name="action_authorize_device">Authorize this device (hand the master key to this session)</string>
+    <string name="pair_authorized_with_requester">Requester identity: %1$s. Hand the reply below to it to finish; nothing has been given to it before that.</string>
+    <string name="pair_authorized">Authorized. Hand the reply below to the new device to finish.</string>
+    <string name="action_copy_reply">Copy the reply</string>
+
+    <!-- Logging in on a new device -->
+    <string name="join_intro">On a device that is already unlocked, choose “Pair a new device”, then paste the pairing code it shows below.</string>
+    <string name="field_pairing_code">Pairing code (from the unlocked device)</string>
+    <string name="action_read_pairing_code_from_image">Read the pairing code from an image</string>
+    <string name="error_image_has_no_pairing_code">This image holds no readable pairing code.</string>
+    <string name="message_pairing_code_read">The pairing code was read from the image.</string>
+    <string name="join_error_bad_code">This is not a usable pairing code, or this machine has no usable platform key store.</string>
+    <string name="action_generate_request">Generate the request</string>
+    <string name="join_error_request_failed">The request cannot be generated: the platform key store refused the operation.</string>
+    <string name="join_hand_back_request">Hand the text below back to that device:</string>
+    <string name="action_copy_request">Copy the request</string>
+    <string name="field_reply">Reply (from that device)</string>
+    <string name="action_read_reply_from_image">Read the reply from an image</string>
+    <string name="error_image_has_no_reply">This image holds no readable reply.</string>
+    <string name="message_reply_read">The reply was read from the image.</string>
+    <string name="join_error_reply_rejected">The reply did not verify: it may not belong to this pairing, or the passphrase or the session does not match.</string>
+    <string name="error_joined_but_not_serialized">Login succeeded, but the vault cannot be serialized.</string>
+    <string name="action_complete_login">Finish the login</string>
+
+    <!-- Settings -->
+    <string name="settings_language">Language</string>
+    <string name="language_system">Follow the system language</string>
+    <string name="settings_key_store">Master key</string>
+    <string name="settings_master_key_hardware">In the platform key store, hardware protected</string>
+    <string name="settings_master_key_file">In a file on this device, protected by your operating system account only</string>
+    <string name="settings_device_identity">Device identity</string>
+    <string name="settings_no_device_identity">None: this vault cannot pair or sync</string>
+    <string name="settings_hardware_backed">hardware protected</string>
+    <string name="settings_software_backed">not hardware protected</string>
+    <string name="settings_core_version">Core library</string>
+    <string name="settings_lock_now">Lock now</string>
+    <string name="settings_recovery">Recovery key</string>
+    <string name="settings_recovery_explainer">A recovery key file together with a passphrase you choose can restore the master key if every device is lost. Keep it offline: whoever holds the file and the passphrase holds the account.</string>
+    <string name="action_export_recovery">Export a recovery key…</string>
+    <string name="action_import_recovery">Import a recovery key…</string>
+    <string name="field_passphrase">Passphrase</string>
+    <string name="field_passphrase_again">Passphrase again</string>
+    <string name="error_passphrase_mismatch">The two passphrases are not the same.</string>
+    <string name="error_recovery_export">The recovery key could not be created.</string>
+    <string name="error_recovery_save">The recovery key could not be saved.</string>
+    <string name="error_recovery_open">The file could not be read.</string>
+    <string name="error_recovery_rejected">Not accepted: the passphrase is wrong, or this file is not a recovery key.</string>
+    <string name="message_recovery_saved">Saved to %1$s</string>
+    <string name="dialog_import_recovery_title">Replace this device's vault?</string>
+    <string name="dialog_import_recovery_text">Importing an account's recovery key replaces what is on this device with that account. Entries that exist only here are not merged, and are lost.</string>
+    <string name="settings_about">About</string>
+    <string name="settings_license">The application is Apache-2.0; the Rust layers it builds on are LGPL-3.0-or-later.</string>
 </resources>

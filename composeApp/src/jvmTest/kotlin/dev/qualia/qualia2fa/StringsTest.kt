@@ -1,10 +1,9 @@
 package dev.qualia.qualia2fa
 
 import dev.qualia.qualia2fa.resources.Res
-import dev.qualia.qualia2fa.resources.entry_count
+import dev.qualia.qualia2fa.resources.selection_count
 import dev.qualia.qualia2fa.resources.status_locked
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 import org.w3c.dom.Element
 import java.io.File
@@ -79,7 +78,7 @@ class StringsTest {
      * same way the application does.
      */
     @Test
-    fun theLocaleSelectsTheCatalogue() =
+    fun theLocaleSelectsTheCatalogue(): Unit =
         runBlocking {
             withLocale("en-US") {
                 assertEquals("Locked", getString(Res.string.status_locked))
@@ -96,17 +95,20 @@ class StringsTest {
             }
         }
 
-    /** The plural form follows the language, which is why this one is not a plain string. */
+    /**
+     * A placeholder is filled in, and the words around it come from the catalogue.
+     *
+     * The interface has no plural forms at the moment: the counts it shows read the same in
+     * both languages ("1 selected", "已选 1 项"), so there is no quantity string to pin.
+     */
     @Test
-    fun pluralsFollowTheLanguage() =
+    fun placeholdersAreFilledFromTheCatalogue(): Unit =
         runBlocking {
             withLocale("en-US") {
-                assertEquals("1 entry", getPluralString(Res.plurals.entry_count, 1, 1))
-                assertEquals("2 entries", getPluralString(Res.plurals.entry_count, 2, 2))
+                assertEquals("3 selected", getString(Res.string.selection_count, 3))
             }
             withLocale("zh-CN") {
-                assertEquals("1 条", getPluralString(Res.plurals.entry_count, 1, 1))
-                assertEquals("2 条", getPluralString(Res.plurals.entry_count, 2, 2))
+                assertEquals("已选 3 项", getString(Res.string.selection_count, 3))
             }
         }
 

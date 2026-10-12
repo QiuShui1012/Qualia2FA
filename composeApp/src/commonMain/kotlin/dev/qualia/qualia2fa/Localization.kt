@@ -4,15 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidedValue
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.language_system
-import dev.qualia.qualia2fa.resources.status_created_hardware
-import dev.qualia.qualia2fa.resources.status_created_software
-import dev.qualia.qualia2fa.resources.status_joined
-import dev.qualia.qualia2fa.resources.status_local_vault
 import dev.qualia.qualia2fa.resources.status_locked
 import dev.qualia.qualia2fa.resources.status_locked_on_blur
 import dev.qualia.qualia2fa.resources.status_locked_on_timeout
-import dev.qualia.qualia2fa.resources.status_opening_vault
-import dev.qualia.qualia2fa.resources.status_unlocked
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -73,18 +67,15 @@ fun AppLanguage.label(): String =
     }
 
 /**
- * What the status line says.
+ * Why the vault is locked, as the login screen reports it.
  *
- * A value rather than a translated string: the language can be switched while the line is
- * on screen, and a stored `String` would keep the text of the language it was built in.
+ * A value rather than a translated string: the language can be switched while the screen is
+ * up, and a stored `String` would keep the language it was built in. Only the ways a vault
+ * *becomes* locked are here — "opened" and "created" are not states the interface shows,
+ * because what is worth telling the user about a key store belongs in the settings, where it
+ * stays readable instead of passing by.
  */
 sealed interface Status {
-    /** The vault is being opened. */
-    data object OpeningVault : Status
-
-    /** The vault is open. */
-    data object Unlocked : Status
-
     /** The user locked the vault. */
     data object Locked : Status
 
@@ -93,36 +84,13 @@ sealed interface Status {
 
     /** The vault was locked after [seconds] without activity. */
     data class LockedAfterTimeout(val seconds: Int) : Status
-
-    /** The device joined an account through pairing. */
-    data object JoinedThroughPairing : Status
-
-    /**
-     * A device identity was created in [backend].
-     *
-     * [hardwareBacked] must be reported as the platform key store answered it: a key that
-     * is not hardware protected is a fact the user is entitled to read.
-     */
-    data class CreatedDeviceIdentity(val backend: String, val hardwareBacked: Boolean) : Status
-
-    /** The vault exists only on this device, so it cannot pair or sync. */
-    data object LocalVaultOnly : Status
 }
 
 /** The text of this status in the language currently in effect. */
 @Composable
 fun Status.text(): String =
     when (this) {
-        Status.OpeningVault -> stringResource(Res.string.status_opening_vault)
-        Status.Unlocked -> stringResource(Res.string.status_unlocked)
         Status.Locked -> stringResource(Res.string.status_locked)
         Status.LockedOnBlur -> stringResource(Res.string.status_locked_on_blur)
         is Status.LockedAfterTimeout -> stringResource(Res.string.status_locked_on_timeout, seconds)
-        Status.JoinedThroughPairing -> stringResource(Res.string.status_joined)
-        is Status.CreatedDeviceIdentity ->
-            stringResource(
-                if (hardwareBacked) Res.string.status_created_hardware else Res.string.status_created_software,
-                backend,
-            )
-        Status.LocalVaultOnly -> stringResource(Res.string.status_local_vault)
     }

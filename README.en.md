@@ -32,20 +32,32 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 
 **Early development, Windows desktop only so far.** What already works:
 
+- **The screens**: the application opens on a loading screen (mark, name, ring; a narrow
+  window moves the ring underneath, a short one drops the name and then the ring), then
+  either the login screen, when there is no key on this device, or the main screens
+- **The main screens**: 2FA, sync and settings share one navigation — a rail down the left
+  in landscape, a bar across the bottom in portrait, with the current screen highlighted —
+  and every screen rearranges itself for the window it is in
 - **First run**: create a vault (the device identity and the master key go to the platform
   key store, which is reported as it is — TPM or software), or log in by pairing with a
-  device that is already unlocked
+  device that is already unlocked. A device that already holds a master key is only offered
+  unlocking and logging in: creating a vault there would replace that key
 - **Entries**: add, edit and delete by hand, and import one from an `otpauth://` QR code in
-  an image
+  an image; selection mode deletes several at once, after asking, because the tombstone
+  reaches every device the account syncs with
 - **Codes**: live display, countdown ring, one-click copy (the clipboard is cleared again
   after 30 seconds, and only if it still holds what was copied)
-- **Pairing**: both sides have their screens; a pairing code can be drawn as a QR code and
+- **Pairing**: started from the sync screen; a pairing code can be drawn as a QR code and
   read back out of an image, and the text always stays underneath the code
 - **Syncing**: two devices show one code each, one direction at a time; wherever the two
   disagree, the user decides entry by entry
-- **Recovery keys**: export and import
+- **Settings**: the interface language, the protection the master key and the device
+  identity actually have, recovery key import and export, and locking now
+- **Recovery keys**: export (the passphrase is typed twice) and import (replacing this
+  device's vault is confirmed first, then the passphrase is asked for)
 - **Locking**: losing focus locks the vault, there is a 15-minute absolute timeout, and
-  locking releases the key material and clears the clipboard
+  locking releases the key material and clears the clipboard; the login screen unlocks it
+  again
 
 Not there yet: LAN and hotspot syncing, multiple accounts, master key rotation, Android and
 iOS.
@@ -96,8 +108,11 @@ cargo test --all-targets        # QualiaTransport
 ```
 composeApp/
 ├── src/commonMain/             UI and business code (Kotlin, multiplatform)
-│   ├── composeResources/       Interface text: values/ English (default), values-zh/ Chinese
+│   ├── composeResources/       The mark and the icons (drawable/), interface text: values/ English (default), values-zh/ Chinese
 │   └── kotlin/dev/qualia/qualia2fa/
+│       ├── Layout.kt           What each window size shows, written as pure functions so they can be tested
+│       ├── Theme.kt            Colours, corners and spacing: the palette is the mark's own (#EAF2F4 and #091012)
+│       └── *Screen.kt          Loading, login, 2FA, sync, settings, and both sides of pairing
 ├── src/jvmMain/                Desktop implementation: file storage, file dialogs, the window and locking on focus loss
 └── src/jvmTest/                Unit tests
 ```
@@ -106,12 +121,19 @@ composeApp/
 sees ordinary Kotlin values, so replacing, patching or forking the binding layer touches that
 one file.
 
+`icons/` holds the `.ico` used for packaging (the Windows installer and the window icon); it
+is regenerated from the mark by `icons/make_ico.py`.
+
 ## Interface languages
 
 The text lives in `composeApp/src/commonMain/composeResources/`: `values/` is the default
 locale (English) and `values-zh/` is the Chinese translation. The language follows the system
-by default and can be switched on either main screen; the choice is kept in
+by default and can be switched on the login screen and in the settings; the choice is kept in
 `settings.properties` in the data directory.
+
+The selector on the login screen is deliberate: that is the last screen before the vault is
+open, and a user who cannot read the interface would otherwise have to reach the settings to
+change it — reading them being exactly what they cannot do.
 
 `StringsTest` compares the key sets of the two catalogues: a missing translation falls back to
 English silently at runtime, and that comparison is the only thing that catches it.

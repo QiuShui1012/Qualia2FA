@@ -458,6 +458,25 @@ object Qualia {
         }
 
     /**
+     * What the platform key store says about this device's identity.
+     *
+     * Read in one call so that the fingerprint and the protection behind it cannot come from
+     * two different answers; `null` means there is no usable store, which is a fact the user
+     * interface has to report rather than a failure.
+     */
+    fun deviceIdentity(label: String): DeviceIdentity? =
+        try {
+            val keys = FfiPlatformKeys.open(label)
+            DeviceIdentity(
+                id = keys.deviceId(),
+                backend = keys.backend(),
+                hardwareBacked = keys.isHardwareBacked(),
+            )
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
      * Opens a synchronization session for [vault], claiming [deviceId] on the channel.
      *
      * Returns `null` when the session cannot be created. The vault is **mutated** by a merge
@@ -546,6 +565,19 @@ class SyncSession internal constructor(
             false
         }
 }
+
+/**
+ * One device's identity, as the platform key store describes it.
+ *
+ * [backend] is what actually answered — `"tpm"` or `"software"` — and [hardwareBacked] says
+ * whether that answer is hardware protection. Both are reported as they are: the user is
+ * entitled to know which of the two protects the account.
+ */
+data class DeviceIdentity(
+    val id: String,
+    val backend: String,
+    val hardwareBacked: Boolean,
+)
 
 /** What one merge produced. */
 sealed interface SyncMerge {

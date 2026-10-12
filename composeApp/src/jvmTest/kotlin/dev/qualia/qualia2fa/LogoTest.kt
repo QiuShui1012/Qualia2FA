@@ -2,13 +2,7 @@ package dev.qualia.qualia2fa
 
 import dev.qualia.qualia2fa.resources.Res
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.Data
-import org.jetbrains.skia.ImageInfo
-import org.jetbrains.skia.svg.SVGDOM
 import kotlin.test.Test
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -24,8 +18,8 @@ import kotlin.test.assertTrue
  * # Android is the exception
  *
  * Compose resources support SVG everywhere **except Android**, which this project does not
- * build yet. When that target arrives, the mark needs a vector drawable there; this comment
- * and this test are where that is written down.
+ * build yet. When that target arrives, the mark and the icons need vector drawables there;
+ * this comment and this test are where that is written down.
  */
 class LogoTest {
     /** Side length of the raster the mark is drawn into; its own view box is 110. */
@@ -37,40 +31,26 @@ class LogoTest {
             val bytes = Res.readBytes("drawable/qualia2fa_logo.svg")
             assertTrue(bytes.isNotEmpty(), "the mark must be part of the application's resources")
 
-            val bitmap = Bitmap()
-            assertTrue(
-                bitmap.allocPixels(ImageInfo.makeN32Premul(size, size)),
-                "a raster surface of $size×$size must be allocatable",
-            )
-            val dom = SVGDOM(Data.makeFromBytes(bytes))
-            dom.setContainerSize(size.toFloat(), size.toFloat())
-            dom.render(Canvas(bitmap))
+            val raster = Svg.rasterize(bytes, size)
 
-            // Four bytes per pixel. Which channel is red depends on the platform (Skia's N32
-            // is BGRA on Windows and RGBA elsewhere), so the classification below asks how
-            // bright a pixel is, which both orders agree on.
-            val pixels = assertNotNull(bitmap.readPixels(), "the raster must hand back its pixels")
+            // "How bright is this pixel" rather than "which channel is it in": the channel
+            // order depends on the platform.
             var clear = 0
             var plate = 0
             var stroke = 0
             var edge = 0
-            for (index in pixels.indices step 4) {
-                val alpha = pixels[index + 3].toInt() and 0xFF
-                val channels =
-                    intArrayOf(
-                        pixels[index].toInt() and 0xFF,
-                        pixels[index + 1].toInt() and 0xFF,
-                        pixels[index + 2].toInt() and 0xFF,
-                    )
+            for (index in 0 until raster.size) {
+                if (!raster.isDrawn(index)) {
+                    clear++
+                    continue
+                }
+                val channels = raster.channels(index)
                 when {
-                    alpha < 128 -> clear++
                     channels.min() > 180 -> plate++
                     channels.max() < 80 -> stroke++
                     else -> edge++
                 }
             }
-            val total = clear + plate + stroke + edge
-            assertTrue(total > size * size - 16, "every pixel must be classified, got $total")
 
             assertTrue(
                 clear > 0,
@@ -79,8 +59,8 @@ class LogoTest {
             assertTrue(stroke > 100, "the line work must be drawn, only $stroke pixels are dark")
             assertTrue(plate > stroke, "the plate is most of the mark: plate=$plate stroke=$stroke")
             assertTrue(
-                edge * 10 < total,
-                "too many pixels are neither plate nor line ($edge of $total): the drawing is garbled",
+                edge * 10 < raster.size,
+                "too many pixels are neither plate nor line ($edge of ${raster.size}): the drawing is garbled",
             )
         }
 }

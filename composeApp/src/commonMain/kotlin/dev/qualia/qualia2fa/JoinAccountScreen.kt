@@ -8,19 +8,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_back
 import dev.qualia.qualia2fa.resources.action_complete_login
@@ -48,11 +45,16 @@ import dev.qualia.qualia2fa.resources.message_reply_read
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The side that is joining an account, driven by text.
+ * The joining side of a login: a new device that has no master key yet.
  *
- * Three steps, and the text that moves between them is exactly what a QR code carries:
- * paste the host's payload, hand the request back, paste the host's reply. Keeping the flow
- * before the pixels means the two can be swapped independently.
+ * The design asks for this flow to run on the sync screen **without navigation**, and that is
+ * what it is: the same three code-carrying steps as a sync, in the same visual language, with
+ * no navigation around it because the device is not in the account yet and the main screens
+ * have nothing to show.
+ *
+ * The transfer itself cannot be a sync: a sync payload is encrypted with the master key, and
+ * this device does not have it. What travels here is the key, through the pairing handshake —
+ * one direction, host to joiner — protected by the out-of-band code the user carries.
  */
 @Composable
 fun JoinAccountScreen(
@@ -65,7 +67,6 @@ fun JoinAccountScreen(
     var requestText by remember { mutableStateOf<String?>(null) }
     var replyText by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
-    val clipboard = LocalClipboardManager.current
 
     val copied = stringResource(Res.string.message_copied)
     val unreadableImage = stringResource(Res.string.error_image_unreadable)
@@ -81,79 +82,21 @@ fun JoinAccountScreen(
     val imageFilesLabel = stringResource(Res.string.filter_image_files)
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(Space.l).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(Space.l),
     ) {
-        Text(stringResource(Res.string.action_join_existing_account), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(Res.string.join_intro), style = MaterialTheme.typography.bodyMedium)
-
-        OutlinedTextField(
-            value = payload,
-            onValueChange = { payload = it },
-            label = { Text(stringResource(Res.string.field_pairing_code)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        OutlinedButton(onClick = {
-            val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-            if (image == null) {
-                message = unreadableImage
-            } else {
-                val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                if (read == null) {
-                    message = noPairingCode
-                } else {
-                    payload = read
-                    message = pairingCodeRead
-                }
-            }
-        }) {
-            Text(stringResource(Res.string.action_read_pairing_code_from_image))
+        ScreenHeader(title = stringResource(Res.string.action_join_existing_account)) {
+            TextButton(onClick = onCancel) { Text(stringResource(Res.string.action_back)) }
         }
+        Hint(stringResource(Res.string.join_intro))
 
-        Button(
-            onClick = {
-                val started = Qualia.joinPairing(payload.trim(), DEVICE_LABEL)
-                if (started == null) {
-                    message = badCode
-                } else {
-                    val request = started.requestText()
-                    if (request == null) {
-                        message = requestFailed
-                    } else {
-                        joiner = started
-                        requestText = request
-                        message = null
-                    }
-                }
-            },
-            enabled = payload.isNotBlank() && joiner == null,
-        ) {
-            Text(stringResource(Res.string.action_generate_request))
-        }
-
-        requestText?.let { request ->
-            Text(stringResource(Res.string.join_hand_back_request), style = MaterialTheme.typography.bodyMedium)
-            // The other device reads this back; the text underneath is what it types or
-            // pastes when scanning is not possible.
-            remember(request) { Qualia.qrImage(request) }?.let { code ->
-                QrCodeView(code)
-            }
-            Text(request, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = {
-                clipboard.setText(AnnotatedString(request))
-                message = copied
-            }) {
-                Text(stringResource(Res.string.action_copy_request))
-            }
-
+        SectionCard(title = stringResource(Res.string.field_pairing_code)) {
             OutlinedTextField(
-                value = replyText,
-                onValueChange = { replyText = it },
-                label = { Text(stringResource(Res.string.field_reply)) },
+                value = payload,
+                onValueChange = { payload = it },
+                label = { Text(stringResource(Res.string.field_pairing_code)) },
                 modifier = Modifier.fillMaxWidth(),
             )
-
             OutlinedButton(onClick = {
                 val image = pickGrayImage(pickImageTitle, imageFilesLabel)
                 if (image == null) {
@@ -161,39 +104,85 @@ fun JoinAccountScreen(
                 } else {
                     val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
                     if (read == null) {
-                        message = noReply
+                        message = noPairingCode
                     } else {
-                        replyText = read
-                        message = replyRead
+                        payload = read
+                        message = pairingCodeRead
                     }
                 }
             }) {
-                Text(stringResource(Res.string.action_read_reply_from_image))
+                Text(stringResource(Res.string.action_read_pairing_code_from_image))
             }
-
             Button(
                 onClick = {
-                    val current = joiner
-                    val joined = current?.completeText(replyText.trim(), storage.masterKeyStore)
-                    if (joined == null) {
-                        message = replyRejected
+                    val started = Qualia.joinPairing(payload.trim(), DEVICE_LABEL)
+                    if (started == null) {
+                        message = badCode
                     } else {
-                        val data = joined.serialize()
-                        if (data == null) {
-                            message = notSerialized
+                        val request = started.requestText()
+                        if (request == null) {
+                            message = requestFailed
                         } else {
-                            storage.saveVault(data)
-                            onJoined(joined)
+                            joiner = started
+                            requestText = request
+                            message = null
                         }
                     }
                 },
-                enabled = replyText.isNotBlank(),
+                enabled = payload.isNotBlank() && joiner == null,
             ) {
-                Text(stringResource(Res.string.action_complete_login))
+                Text(stringResource(Res.string.action_generate_request))
             }
         }
 
-        message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.action_back)) }
+        requestText?.let { request ->
+            SectionCard(title = stringResource(Res.string.join_hand_back_request)) {
+                CodeBlock(code = request, onCopied = { message = copied })
+                OutlinedTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    label = { Text(stringResource(Res.string.field_reply)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedButton(onClick = {
+                    val image = pickGrayImage(pickImageTitle, imageFilesLabel)
+                    if (image == null) {
+                        message = unreadableImage
+                    } else {
+                        val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
+                        if (read == null) {
+                            message = noReply
+                        } else {
+                            replyText = read
+                            message = replyRead
+                        }
+                    }
+                }) {
+                    Text(stringResource(Res.string.action_read_reply_from_image))
+                }
+                Button(
+                    onClick = {
+                        val current = joiner
+                        val joined = current?.completeText(replyText.trim(), storage.masterKeyStore)
+                        if (joined == null) {
+                            message = replyRejected
+                        } else {
+                            val data = joined.serialize()
+                            if (data == null) {
+                                message = notSerialized
+                            } else {
+                                storage.saveVault(data)
+                                onJoined(joined)
+                            }
+                        }
+                    },
+                    enabled = replyText.isNotBlank(),
+                ) {
+                    Text(stringResource(Res.string.action_complete_login))
+                }
+            }
+        }
+
+        MessageLine(message)
     }
 }
