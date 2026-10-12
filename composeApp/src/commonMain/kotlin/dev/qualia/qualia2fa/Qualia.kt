@@ -2,6 +2,8 @@ package dev.qualia.qualia2fa
 
 import dev.qualia.qualia2fa.ffi.FfiAlgorithm
 import dev.qualia.qualia2fa.ffi.FfiDigits
+import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
+import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
 import dev.qualia.qualia2fa.ffi.FfiSecureStore
 import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
@@ -288,6 +290,24 @@ object Qualia {
     fun hasMasterKey(store: MasterKeyStore): Boolean = store.load() != null
 
     /**
+     * Registers this device: generates the master key, creates the device identity in the
+     * platform key store, and writes the master key to [store].
+     *
+     * This is the path that can be paired and synced later, because the device identity
+     * is what the login handshake proves. Returns `null` when the platform key store is
+     * unavailable, which is a state to report to the user rather than to work around
+     * silently.
+     */
+    fun register(store: MasterKeyStore, label: String): Registration? =
+        try {
+            val keys = FfiPlatformKeys.open(label)
+            val vault = Vault(FfiVault.register(PlatformKeysBridge(keys), StoreBridge(store), label))
+            Registration(vault = vault, backend = keys.backend(), hardwareBacked = keys.isHardwareBacked())
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
      * Imports a recovery file and returns the vault it unlocks.
      *
      * The core writes the master key into [store] and hands back its bytes, which are
@@ -322,3 +342,27 @@ private class StoreBridge(private val inner: MasterKeyStore) : FfiSecureStore {
 
     override fun `isHardwareBacked`(): Boolean = inner.isHardwareBacked
 }
+
+/**
+ * Adapts the platform key store to the callback interface the binding layer expects.
+ *
+ * The generated object is already bound to one label, so the label the callback carries
+ * is the same one and is not used again here. It forwards and decides nothing.
+ */
+private class PlatformKeysBridge(private val inner: FfiPlatformKeys) : FfiDeviceKeys {
+    override fun `getOrCreate`(`label`: String): ByteArray = inner.devicePublicKey()
+
+    override fun `sign`(`label`: String, `message`: ByteArray): ByteArray = inner.sign(message)
+}
+
+/**
+ * What a successful registration produced.
+ *
+ * [backend] and [hardwareBacked] come from the platform key store and are reported to the
+ * user: a key that is not hardware backed is a fact the user is entitled to know.
+ */
+data class Registration(
+    val vault: Vault,
+    val backend: String,
+    val hardwareBacked: Boolean,
+)

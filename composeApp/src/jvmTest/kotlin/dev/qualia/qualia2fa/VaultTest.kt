@@ -27,6 +27,42 @@ private class MemoryStore(initial: ByteArray? = null) : MasterKeyStore {
 class VaultTest {
     private val secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
+    /**
+     * Registration is the path that creates a device identity, which is what pairing and
+     * syncing later prove. It needs a working platform key store, so a machine without one
+     * skips rather than fails — and says so, because a silently skipped test is a test
+     * nobody knows the state of.
+     *
+     * The label is fixed, and the key store reuses the key pair for a label, so repeated
+     * runs leave one identity behind rather than one per run. It is not deleted here: the
+     * facade has no delete yet, and deleting a device identity is the kind of thing a user
+     * should confirm anyway.
+     */
+    @Test
+    fun registrationCreatesADeviceIdentity() {
+        val store = MemoryStore()
+        val registration = Qualia.register(store, "qualia2fa-test-device")
+        if (registration == null) {
+            println("skipping: no usable platform key store on this machine")
+            return
+        }
+
+        assertTrue(
+            registration.backend == "tpm" || registration.backend == "software",
+            "the backend must be reported as one of the two, got ${registration.backend}",
+        )
+        assertEquals(
+            registration.backend == "tpm",
+            registration.hardwareBacked,
+            "the hardware flag must agree with the backend it reports",
+        )
+        assertEquals(0, registration.vault.entryCount, "a fresh registration has no entries")
+        assertNotNull(store.load(), "registration must write the master key to the store")
+
+        val data = assertNotNull(registration.vault.serialize())
+        assertNotNull(Qualia.openVault(data, store), "the registered vault must reopen")
+    }
+
     @Test
     fun aLocalVaultRoundTripsThroughItsFile() {
         val store = MemoryStore()

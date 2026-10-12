@@ -89,9 +89,9 @@ fun App(storage: VaultStorage, blurCount: Int = 0) {
             FirstRunScreen(
                 storage = storage,
                 status = status,
-                onCreated = { created ->
+                onCreated = { created, detail ->
                     vault = created
-                    status = "已创建"
+                    status = detail
                 },
             )
         } else {
@@ -107,11 +107,19 @@ fun App(storage: VaultStorage, blurCount: Int = 0) {
 /** How long an unlocked vault stays unlocked with no way for the user to extend it. */
 private const val SESSION_TIMEOUT_SECONDS = 900
 
+/**
+ * The label of this device's identity key pair in the platform key store.
+ *
+ * One label names one key pair for the lifetime of the device, so it is a constant rather
+ * than something derived from user input.
+ */
+private const val DEVICE_LABEL = "qualia2fa-device"
+
 @Composable
 private fun FirstRunScreen(
     storage: VaultStorage,
     status: String,
-    onCreated: (Vault) -> Unit,
+    onCreated: (Vault, String) -> Unit,
 ) {
     val store = storage.masterKeyStore
     var message by remember { mutableStateOf<String?>(null) }
@@ -139,16 +147,31 @@ private fun FirstRunScreen(
         }
 
         Button(onClick = {
-            val created = Qualia.createLocalVault(store)
-            val data = created?.serialize()
-            if (created == null || data == null) {
-                message = "创建失败：核心拒绝了这次请求"
+            val registration = Qualia.register(store, DEVICE_LABEL)
+            if (registration != null) {
+                val data = registration.vault.serialize()
+                if (data == null) {
+                    message = "创建失败：核心无法序列化保险库"
+                } else {
+                    storage.saveVault(data)
+                    onCreated(registration.vault, "设备身份在 ${registration.backend} 里" +
+                        if (registration.hardwareBacked) "（硬件保护）" else "（非硬件保护）")
+                }
             } else {
-                storage.saveVault(data)
-                onCreated(created)
+                // The platform key store is what holds the device identity, and without it
+                // this device cannot pair or sync. Creating a vault anyway is still useful,
+                // but it is a different thing and the user is told so.
+                val created = Qualia.createLocalVault(store)
+                val data = created?.serialize()
+                if (created == null || data == null) {
+                    message = "创建失败：平台密钥库不可用，核心也拒绝了本机保险库"
+                } else {
+                    storage.saveVault(data)
+                    onCreated(created, "本机保险库（无设备身份，不能配对或同步）")
+                }
             }
         }) {
-            Text("创建本机保险库")
+            Text("创建保险库")
         }
 
         OutlinedButton(onClick = { message = "登录需要设备身份密钥库的桥接层，尚未接上。" }, enabled = true) {
