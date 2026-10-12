@@ -21,11 +21,24 @@ plugins {
 // the registry serves under that number. The crate is fetched once, checked against the
 // SHA-256 the registry index publishes for it, and unpacked into `rust/`, which git
 // ignores. Deleting `rust/` re-materializes it.
-val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.0")
-val ffiCrateSha256 = "039c9f20926ad60dd7dd9f72687c45d4a6346ab7e09d20b17f3bb1a072080e49"
+val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.1")
+val ffiCrateSha256 = "f55d6dcc8724dc4c776a9d4a1ff760c76f5824d6b5c12dc51742b014412db0ff"
 val rustSourceDir = layout.projectDirectory.dir("rust").asFile
+val rustManifest = rustSourceDir.resolve("Cargo.toml")
 
-if (!rustSourceDir.resolve("Cargo.toml").isFile) {
+// The materialized copy is only reused when it is the version this build asks for;
+// otherwise a version bump would silently keep building the old crate.
+val materializedVersion =
+    if (rustManifest.isFile) {
+        Regex("""(?m)^version = "([^"]+)"""")
+            .find(rustManifest.readText())?.groupValues?.get(1)
+    } else {
+        null
+    }
+
+if (materializedVersion != ffiCrateVersion) {
+    if (rustSourceDir.exists()) rustSourceDir.deleteRecursively()
+    rustSourceDir.mkdirs()
     val crateFile = layout.buildDirectory.file("crates/qualia2fa-ffi-$ffiCrateVersion.crate").get().asFile
     if (!crateFile.isFile) {
         crateFile.parentFile.mkdirs()
