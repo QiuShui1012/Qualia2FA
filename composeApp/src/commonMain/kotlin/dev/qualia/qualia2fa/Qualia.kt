@@ -7,6 +7,7 @@ import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
 import dev.qualia.qualia2fa.ffi.coreVersion as ffiCoreVersion
 import dev.qualia.qualia2fa.ffi.generateSecretBase32 as ffiGenerateSecretBase32
+import dev.qualia.qualia2fa.ffi.importRecoveryKey as ffiImportRecoveryKey
 import dev.qualia.qualia2fa.ffi.totpCode as ffiTotpCode
 
 /**
@@ -146,6 +147,19 @@ class Vault internal constructor(private val inner: FfiVault) {
             null
         }
 
+    /**
+     * The recovery file for this vault, protected by [passphrase].
+     *
+     * The master key does not cross this boundary as a value: it is wrapped into the file
+     * by the core, with the key derivation parameters the core picks.
+     */
+    fun recoveryFile(passphrase: String): ByteArray? =
+        try {
+            inner.exportRecoveryKey(passphrase, null, null, null)
+        } catch (_: Exception) {
+            null
+        }
+
     private companion object {
         /**
          * The identifier of a new entry, as the core expects it: the core assigns the
@@ -272,6 +286,23 @@ object Qualia {
 
     /** Whether this device already holds a master key. */
     fun hasMasterKey(store: MasterKeyStore): Boolean = store.load() != null
+
+    /**
+     * Imports a recovery file and returns the vault it unlocks.
+     *
+     * The core writes the master key into [store] and hands back its bytes, which are
+     * wiped here as soon as the vault holds its own copy. Returns `null` when the
+     * passphrase is wrong or the file is not a recovery file.
+     */
+    fun importRecoveryFile(file: ByteArray, passphrase: String, store: MasterKeyStore): Vault? =
+        try {
+            val key = ffiImportRecoveryKey(file, passphrase, StoreBridge(store))
+            val vault = Vault(FfiVault.fromMasterKey(key))
+            wipe(key)
+            vault
+        } catch (_: Exception) {
+            null
+        }
 
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32

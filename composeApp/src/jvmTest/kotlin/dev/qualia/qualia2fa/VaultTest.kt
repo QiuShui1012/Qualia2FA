@@ -88,6 +88,42 @@ class VaultTest {
         assertEquals("Test", assertNotNull(vault.entries().firstOrNull()).name)
     }
 
+    /**
+     * A recovery file carries the master key, not the entries: the entries live in the
+     * vault file, so recovering on another device means importing the file **and** having
+     * the vault file (which is what a backup is). This test walks exactly that path.
+     */
+    @Test
+    fun aRecoveryFileRestoresTheKeyThatOpensTheVault() {
+        val store = MemoryStore()
+        val vault = assertNotNull(Qualia.createLocalVault(store))
+        assertNotNull(vault.addEntry("Test", "Example", "", secret, 6, 30, "", 1_700_000_000))
+        val vaultData = assertNotNull(vault.serialize())
+
+        val file = assertNotNull(vault.recoveryFile("correct horse battery staple"), "exporting must succeed")
+        assertTrue(file.size > 100, "the recovery file must not be the bare key")
+
+        val fresh = MemoryStore()
+        val unlocked = assertNotNull(
+            Qualia.importRecoveryFile(file, "correct horse battery staple", fresh),
+            "the passphrase must restore the key",
+        )
+        assertEquals(0, unlocked.entryCount, "the recovery file carries no entries")
+        assertNotNull(fresh.load(), "the imported master key must reach the store")
+
+        val reopened = assertNotNull(
+            Qualia.openVault(vaultData, fresh),
+            "the recovered key must open the vault file",
+        )
+        assertEquals(1, reopened.entryCount)
+        assertEquals("Test", reopened.entries().first().name)
+
+        assertNull(
+            Qualia.importRecoveryFile(file, "wrong passphrase", MemoryStore()),
+            "a wrong passphrase must not unlock anything",
+        )
+    }
+
     @Test
     fun anotherKeyCannotOpenTheFile() {
         val store = MemoryStore()
