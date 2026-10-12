@@ -83,6 +83,11 @@ fun JoinAccountScreen(
 
         requestText?.let { request ->
             Text("把下面这段交回给那台设备：", style = MaterialTheme.typography.bodyMedium)
+            // The other device reads this back; the text underneath is what it types or
+            // pastes when scanning is not possible.
+            remember(request) { Qualia.qrImage(request) }?.let { code ->
+                QrCodeView(code)
+            }
             Text(request, style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = {
                 clipboard.setText(AnnotatedString(request))

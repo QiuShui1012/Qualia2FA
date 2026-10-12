@@ -61,6 +61,11 @@ fun PairNewDeviceScreen(
             "把下面这段配对码交给新设备（只在这一步有效）。它读完之后会给你一段请求。",
             style = MaterialTheme.typography.bodyMedium,
         )
+        // The code is shown when it fits; the text stays underneath either way, because a
+        // code that is too dense to scan must still leave the user a way to continue.
+        remember(host.payload) { Qualia.qrImage(host.payload) }?.let { code ->
+            QrCodeView(code)
+        }
         Text(host.payload, style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = {
             clipboard.setText(AnnotatedString(host.payload))
