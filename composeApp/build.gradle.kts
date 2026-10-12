@@ -21,8 +21,8 @@ plugins {
 // the registry serves under that number. The crate is fetched once, checked against the
 // SHA-256 the registry index publishes for it, and unpacked into `rust/`, which git
 // ignores. Deleting `rust/` re-materializes it.
-val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.1")
-val ffiCrateSha256 = "f55d6dcc8724dc4c776a9d4a1ff760c76f5824d6b5c12dc51742b014412db0ff"
+val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.3")
+val ffiCrateSha256 = "a070a34af3de237635c52aca52da86d1f15f24fa998637cdd20cb5191bc68934"
 val rustSourceDir = layout.projectDirectory.dir("rust").asFile
 val rustManifest = rustSourceDir.resolve("Cargo.toml")
 

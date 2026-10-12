@@ -3,10 +3,13 @@ package dev.qualia.qualia2fa
 import dev.qualia.qualia2fa.ffi.FfiAlgorithm
 import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
+import dev.qualia.qualia2fa.ffi.FfiEcLevel
 import dev.qualia.qualia2fa.ffi.FfiJoiner
 import dev.qualia.qualia2fa.ffi.FfiLogin
 import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
 import dev.qualia.qualia2fa.ffi.FfiSecureStore
+import dev.qualia.qualia2fa.ffi.qrDecode as ffiQrDecode
+import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
 import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
 import dev.qualia.qualia2fa.ffi.coreVersion as ffiCoreVersion
@@ -357,6 +360,46 @@ object Qualia {
 
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32
+
+    /**
+     * Draws [text] as a QR code: [scale] pixels per module, [quietZone] modules of margin.
+     *
+     * Returns `null` when the text does not fit in the largest version this facade allows.
+     * The code is never truncated and the error correction level is never lowered
+     * silently: a code that does not fit is a code the user must be told about.
+     */
+    fun qrImage(text: String, scale: Int = 4, quietZone: Int = 4): QrImage? =
+        try {
+            val image = ffiQrEncode(text, FfiEcLevel.MEDIUM, QR_MAX_VERSION, scale.toUShort(), quietZone.toUShort())
+            QrImage(image.width.toInt(), image.height.toInt(), image.pixels)
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Reads the text out of a **grayscale** image, one byte per pixel.
+     *
+     * The caller decodes the image file itself (`ImageIO` here, the platform API
+     * elsewhere) and converts it to grayscale: image format decoders are where the
+     * historical vulnerabilities live, so they stay on the platform side.
+     *
+     * Returns `null` when there is no readable code in the image, including the case
+     * where the decoder's own panic had to be contained.
+     */
+    fun qrTextFromImage(pixels: ByteArray, width: Int, height: Int): String? =
+        try {
+            ffiQrDecode(pixels, width.toUInt(), height.toUInt())
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * The largest QR version this facade draws, which is 97×97 modules.
+     *
+     * A pairing payload or an `otpauth://` entry fits well inside it; anything larger is
+     * refused rather than drawn at a size no camera will read.
+     */
+    private const val QR_MAX_VERSION: UByte = 20u
 }
 
 /**
@@ -442,6 +485,13 @@ class PairingJoiner internal constructor(
         return complete(reply, store)
     }
 }
+
+/**
+ * A QR code as grayscale pixels, ready to be drawn.
+ *
+ * Plain values only: the generated record does not leave this file.
+ */
+class QrImage(val width: Int, val height: Int, val pixels: ByteArray)
 
 /**
  * Adapts the facade's store interface to the one the binding layer expects.
