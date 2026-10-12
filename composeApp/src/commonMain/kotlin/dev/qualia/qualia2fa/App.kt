@@ -113,7 +113,7 @@ private const val SESSION_TIMEOUT_SECONDS = 900
  * One label names one key pair for the lifetime of the device, so it is a constant rather
  * than something derived from user input.
  */
-private const val DEVICE_LABEL = "qualia2fa-device"
+internal const val DEVICE_LABEL = "qualia2fa-device"
 
 @Composable
 private fun FirstRunScreen(
@@ -123,6 +123,16 @@ private fun FirstRunScreen(
 ) {
     val store = storage.masterKeyStore
     var message by remember { mutableStateOf<String?>(null) }
+    var joining by remember { mutableStateOf(false) }
+
+    if (joining) {
+        JoinAccountScreen(
+            storage = storage,
+            onJoined = { onCreated(it, "已通过配对登录") },
+            onCancel = { joining = false },
+        )
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -174,13 +184,13 @@ private fun FirstRunScreen(
             Text("创建保险库")
         }
 
-        OutlinedButton(onClick = { message = "登录需要设备身份密钥库的桥接层，尚未接上。" }, enabled = true) {
+        OutlinedButton(onClick = { joining = true }) {
             Text("登录到已有账号")
         }
 
         Text(
-            "登录通过二维码从一台已解锁的设备取得主密钥；它需要把设备身份密钥放进平台密钥库，" +
-                "这一层正在接。恢复密钥的导入也会随它一起到位。",
+            "登录会从一台已解锁的设备取得主密钥：那台设备显示配对码，本机用它生成请求，" +
+                "对方确认后把应答交回来。主密钥由二维码这一层带外传递，不经过任何服务器。",
             style = MaterialTheme.typography.bodySmall,
         )
 
