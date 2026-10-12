@@ -26,50 +26,42 @@
 二维码配对、恢复密钥）已完成并有测试覆盖；界面尚未开始。目前还不能作为日常使用的
 2FA 应用。
 
-## 获取与构建
+## 依赖从哪里来
+
+本仓库**不含任何 submodule**。Rust 各层都在自己的仓库里开发、发布到 crates.io，
+应用这一侧按版本依赖它们：
+
+| crate | 内容 | 许可证 |
+|---|---|---|
+| `qualia-dik` | 设备身份原语（表示 / 指纹 / 验签）与平台原生硬件密钥库；唯一允许 `unsafe` 的 crate | LGPL-3.0-or-later |
+| `qualia2fa-core` | 全部密码学、保险库格式、同步与配对协议。无 I/O、无时钟、无 `unsafe` | LGPL-3.0-or-later |
+| `qualia2fa-ffi` | 把核心库暴露为 UniFFI 绑定（Kotlin / Swift），并附带绑定生成器 | LGPL-3.0-or-later |
+| `qualia-transport` | 传输通道：二维码这一半（容量模型、编码、渲染、文本信封、图像解码）已实现 | LGPL-3.0-or-later |
 
 ```bash
-git clone --recurse-submodules https://github.com/Qualia2FA/Qualia2FA
+git clone https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
 ```
 
-> **`--recurse-submodules` 不能省。** 本仓库依赖的三个子模块各自又依赖核心库，
-> 因此漏掉它得到的是一棵**能看不能编译**的树。已经克隆了的话：
+界面代码尚未落地，因此现在还没有一条「构建出应用」的命令。要单独构建某一层，进它
+自己的仓库里做：
 
 ```bash
-git submodule update --init --recursive
-```
-
-界面代码尚未落地，因此现在还没有一条「构建出应用」的命令。三个子模块各自可以
-独立构建与测试：
-
-```bash
-cargo test --manifest-path Core/Cargo.toml --all-targets
-cargo test --manifest-path keystore/Cargo.toml --all-targets
-cargo test --manifest-path FFI/Cargo.toml
+cargo test --all-targets        # Qualia2FA-Core
+cargo test --all-targets        # QualiaDeviceIdentityKit（含打真 TPM 的集成测试）
+cargo test                      # Qualia2FA-FFI
+cargo test --all-targets        # QualiaTransport
 ```
 
 ## 目录结构
 
 ```
 .
-├── Core/          ← git submodule → Qualia2FA-Core
-├── keystore/      ← git submodule → Qualia2FA-Keystore
-│   └── Core/      ← 同一个核心库
-└── FFI/           ← git submodule → Qualia2FA-FFI
-    └── Core/      ← 同一个核心库
+└── （界面代码将直接建在本仓库根目录下）
 ```
 
-| 目录 | 承载什么 | 许可证 |
-|---|---|---|
-| `Core/` | 全部密码学与 2FA 逻辑。无 I/O、无时钟、无 `unsafe` | LGPL-3.0-or-later |
-| `keystore/` | 设备身份密钥对的生成、保管与签名。唯一允许 `unsafe` 的地方 | LGPL-3.0-or-later |
-| `FFI/` | 把核心库暴露给 Kotlin/Swift 的绑定层 | LGPL-3.0-or-later |
-
-界面代码将直接建在本仓库根目录下。
-
-`keystore/` 与 `FFI/` 都按**相对自身的路径**依赖核心库，所以各自带一份 `Core/`。
-三份指向同一个仓库、同一个提交——它们不是三个副本，而是同一棵树的三条引用路径。
+四个 Rust 层各有自己的仓库，本仓库不再以 submodule 的形式引入它们，也不再保存它们
+的副本。
 
 ## 参与贡献
 
@@ -85,15 +77,14 @@ cargo test --manifest-path FFI/Cargo.toml
 ### 初始化开发环境
 
 ```bash
-git clone --recurse-submodules https://github.com/Qualia2FA/Qualia2FA
+git clone https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
-cargo test --manifest-path Core/Cargo.toml --all-targets   # 先确认核心库全绿
 ```
 
 ## 许可证
 
 应用本体采用 Apache License 2.0，见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)。
 
-三个子模块采用 LGPL-3.0-or-later。两套许可证的组合是有意选择——应用层用宽松
-许可证，便于分发与二次开发；核心的密码学实现保持 copyleft，使任何修改都必须
-回馈。
+四个 Rust 层（`qualia-dik`、`qualia2fa-core`、`qualia2fa-ffi`、`qualia-transport`）
+采用 LGPL-3.0-or-later。两套许可证的组合是有意选择——应用层用宽松许可证，便于分发
+与二次开发；核心的密码学实现保持 copyleft，使任何修改都必须回馈。
