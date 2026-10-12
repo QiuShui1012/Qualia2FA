@@ -79,6 +79,9 @@ unpacked into the git-ignored `composeApp/rust/`. When the version changes, **`f
 has to change with it**: changing only the version number fails at that check, which is
 deliberate — it stops "the number says new, the package is old" from passing silently.
 
+Every push runs the same build on GitHub Actions: the unit tests first, then the Windows MSI
+and EXE installers, which are attached to that run.
+
 To build one layer on its own, work inside its own repository:
 
 ```bash

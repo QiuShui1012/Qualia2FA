@@ -1,0 +1,101 @@
+name: Build
+
+# Every push builds the application and the installers for the platforms it supports,
+# and attaches them to the run.
+#
+# # Why only Windows
+#
+# The application targets the desktop JVM, and the Rust library is embedded for the host
+# target only, so a Windows runner builds the whole product: the Rust cdylib, the Kotlin
+# code, and the installers. Android and iOS are M6 work and have no target in the build
+# yet; when they arrive they get their own job here rather than a matrix over this one,
+# because they build completely different artifacts.
+#
+# # What this job does and does not prove
+#
+# It proves that the tree builds from a **clean checkout**: no local Gradle caches, no
+# unpacked Rust source, and the `qualia2fa-ffi` crate fetched from crates.io and checked
+# against the SHA-256 pinned in `composeApp/build.gradle.kts`. It does not prove that the
+# installers run: that needs a machine with a real platform key store, which is the manual
+# pass recorded in the project plan.
+
+on:
+  push:
+    branches: ["**"]
+  # Manual runs: useful for an artifact of a commit that predates this workflow, and for
+  # checking the build of a change without pushing.
+  workflow_dispatch:
+
+# A newer push to the same branch replaces the older run instead of queueing behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x64 (tests + installers)
+    runs-on: windows-latest
+    # A full build takes about fifteen minutes on a cold runner. The ceiling is here to
+    # stop a hung step from occupying a runner for the default six hours.
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # The wrapper jar is a binary that executes in this job. Its checksum has to be the
+      # one Gradle published, so that the build runs the wrapper from the repository
+      # rather than whatever a tampered one would do.
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      # The build sets `jvmToolchain(21)`, and the runner's default JDK is 17.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Only the cargo home is cached, not the build tree.
+      #
+      # The Rust source is materialized into `composeApp/rust/` at configuration time from
+      # the published crate, and the build script **deletes that directory** whenever the
+      # version it finds there is not the version it was asked for. A restored `target/`
+      # would therefore be thrown away before it could be used whenever the version
+      # changed - and when it did not change, the cache key would not have changed either.
+      # What is left worth keeping is the registry: the dependency sources, which the
+      # compile needs on every run.
+      - name: Cache the Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ hashFiles('composeApp/build.gradle.kts') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # The tests include the round trip into the Rust library, so they fail if the
+      # embedded binary is not the one the build pinned.
+      - name: Run the unit tests
+        run: .\gradlew.bat :composeApp:jvmTest
+
+      # MSI needs the WiX toolset and EXE needs Inno Setup; both are installed on the
+      # runner. jlink builds the runtime image and jpackage the installers, so nothing
+      # here needs a JDK on the machine that later runs the application.
+      - name: Build the installers
+        run: .\gradlew.bat :composeApp:packageMsi :composeApp:packageExe
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qualia2FA-windows-x64
+          path: |
+            composeApp/build/compose/binaries/main/msi/*.msi
+            composeApp/build/compose/binaries/main/exe/*.exe
+          # A build that produced no installer is a failure, not an empty artifact.
+          if-no-files-found: error
+          retention-days: 90
