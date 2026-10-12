@@ -119,6 +119,32 @@ class VaultTest {
         )
     }
 
+    /**
+     * The code channel through the facade: the text the interface would draw as a code
+     * comes back out of the pixels, and the two ways it can fail come back as `null`
+     * rather than as an exception the user interface would have to catch.
+     */
+    @Test
+    fun aQrCodeRoundTripsThroughTheFacade() {
+        val text = "otpauth://totp/Example:alice?secret=MZXW6YTBOI"
+        val image = assertNotNull(Qualia.qrImage(text), "the text must fit in a code")
+        assertEquals(image.width, image.height, "a QR code is square")
+        assertTrue(image.width > 20, "the code must have real modules in it")
+        assertEquals(image.width * image.height, image.pixels.size)
+
+        assertEquals(
+            text,
+            Qualia.qrTextFromImage(image.pixels, image.width, image.height),
+            "the text must come back out of the pixels",
+        )
+
+        assertNull(Qualia.qrImage("a".repeat(8_000)), "text that cannot fit must be refused, not truncated")
+        assertNull(
+            Qualia.qrTextFromImage(ByteArray(64 * 64) { -1 }, 64, 64),
+            "a blank image has no code in it",
+        )
+    }
+
     @Test
     fun aLocalVaultRoundTripsThroughItsFile() {
         val store = MemoryStore()
