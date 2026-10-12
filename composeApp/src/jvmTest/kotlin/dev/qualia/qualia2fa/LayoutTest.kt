@@ -108,4 +108,17 @@ class LayoutTest {
         assertEquals(true, isLandscape(CompactWidth + 1.dp, ShortHeight))
         assertEquals(false, isLandscape(ShortHeight, CompactWidth + 1.dp))
     }
+
+    /**
+     * A form puts two short fields on a row only when the row is wide enough for both labels.
+     *
+     * Under that width a half-width field is narrower than the label it carries, and a label
+     * that does not fit is ellipsized — which is how "the field's name disappeared" happens.
+     */
+    @Test
+    fun aFormHasTwoColumnsOnlyWhenItsFieldsKeepTheirLabels() {
+        assertTrue(formHasTwoColumns(FormTwoColumnWidth))
+        assertTrue(formHasTwoColumns(FormTwoColumnWidth + 1.dp))
+        assertFalse(formHasTwoColumns(FormTwoColumnWidth - 1.dp))
+    }
 }

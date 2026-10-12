@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +24,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -552,6 +553,27 @@ private fun LinkDialog(
     )
 }
 
+/**
+ * The fields of one form row: two to a row when the dialog is wide enough, one otherwise.
+ *
+ * It is a wrapping row with a cap on how many items fit, so the caller writes each field once
+ * and gets either arrangement; the fields take `Modifier.weight(1f)` and fill whatever the
+ * row gives them, which is what keeps their labels legible at any width.
+ */
+@Composable
+private fun FormRow(
+    twoColumns: Boolean,
+    content: @Composable FlowRowScope.() -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Space.s),
+        verticalArrangement = Arrangement.spacedBy(Space.s),
+        maxItemsInEachRow = if (twoColumns) 2 else 1,
+        content = content,
+    )
+}
+
 /** The editor, for a new entry and for an existing one. */
 @Composable
 private fun EntryDialog(
@@ -574,73 +596,80 @@ private fun EntryDialog(
             Text(stringResource(if (initial == null) Res.string.dialog_add_entry else Res.string.dialog_edit_entry))
         },
         text = {
-            // The content scrolls and is capped in height, and every field takes the width it
-            // is given rather than a fixed one: in a narrow window a dialog is squeezed to
-            // what fits, and a field with a width of its own is then narrowed until its label
-            // is an ellipsis - which is what "the label disappeared" looks like.
-            Column(
-                modifier =
-                    Modifier
-                        .verticalScroll(rememberScrollState())
-                        .heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(Space.s),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(Res.string.field_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = issuer,
-                    onValueChange = { issuer = it },
-                    label = { Text(stringResource(Res.string.field_issuer)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = account,
-                    onValueChange = { account = it },
-                    label = { Text(stringResource(Res.string.field_account)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = secret,
-                    onValueChange = { secret = it },
-                    label = { Text(stringResource(Res.string.field_secret)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // All three are shown at once: a user reading the algorithm off a server's
-                // setup page should find it without opening anything. They wrap rather than
-                // run off the edge when the window is narrow.
-                Text(stringResource(Res.string.field_algorithm), style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-                    OtpAlgorithm.entries.forEach { option ->
-                        FilterChip(
-                            selected = option == algorithm,
-                            onClick = { algorithm = option },
-                            label = { Text(option.label) },
+            // A wide dialog puts the short fields two to a row, a narrow one stacks them.
+            // That arrangement is what keeps the form inside the dialog: a column of six
+            // fields is taller than a small window, and whatever does not fit is clipped by
+            // the dialog's own surface, which is what "the values inside are not visible"
+            // looks like — a field cut in half by the edge. The scroll is the fallback for a
+            // window short enough to defeat even this.
+            BoxWithConstraints {
+                val twoColumns = formHasTwoColumns(maxWidth)
+
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Space.s),
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(stringResource(Res.string.field_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    FormRow(twoColumns) {
+                        OutlinedTextField(
+                            value = issuer,
+                            onValueChange = { issuer = it },
+                            label = { Text(stringResource(Res.string.field_issuer)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = account,
+                            onValueChange = { account = it },
+                            label = { Text(stringResource(Res.string.field_account)) },
+                            modifier = Modifier.weight(1f),
                         )
                     }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+
                     OutlinedTextField(
-                        value = digits,
-                        onValueChange = { digits = it },
-                        label = { Text(stringResource(Res.string.field_digits)) },
+                        value = secret,
+                        onValueChange = { secret = it },
+                        label = { Text(stringResource(Res.string.field_secret)) },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
-                        value = period,
-                        onValueChange = { period = it },
-                        label = { Text(stringResource(Res.string.field_period)) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
+
+                    // All three are shown at once: a user reading the algorithm off a server's
+                    // setup page should find it without opening anything.
+                    Text(stringResource(Res.string.field_algorithm), style = MaterialTheme.typography.labelLarge)
+                    ChoiceRow(
+                        options = OtpAlgorithm.entries,
+                        selected = algorithm,
+                        label = { it.label },
+                        onSelect = { algorithm = it },
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                }
-                TextButton(onClick = { secret = Qualia.newSecret() }) {
-                    Text(stringResource(Res.string.action_generate_secret))
+
+                    FormRow(twoColumns) {
+                        OutlinedTextField(
+                            value = digits,
+                            onValueChange = { digits = it },
+                            label = { Text(stringResource(Res.string.field_digits)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = period,
+                            onValueChange = { period = it },
+                            label = { Text(stringResource(Res.string.field_period)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    TextButton(onClick = { secret = Qualia.newSecret() }) {
+                        Text(stringResource(Res.string.action_generate_secret))
+                    }
                 }
             }
         },

@@ -1,5 +1,13 @@
 package dev.qualia.qualia2fa
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -24,10 +34,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_copy
 import org.jetbrains.compose.resources.stringResource
@@ -148,6 +163,92 @@ fun CodeBlock(code: String, onCopied: () -> Unit) {
 fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall)
 }
+
+/**
+ * A row of mutually exclusive options, drawn as segments of one control.
+ *
+ * # Why not a row of chips
+ *
+ * A chip draws its hover over a container that is transparent when it is not selected, so
+ * what the pointer highlights is a state layer rather than the control's own surface: the
+ * colour around the label and the colour the rest of the chip takes come from two different
+ * places, and they do not match. Here each option is **one** surface with **one** background
+ * — the label sits on it, so there is nothing to mismatch.
+ *
+ * The highlight ramps **linearly** over [CHOICE_FADE_MS]. The shape of that ramp is what makes
+ * it look smooth, not its length: an eased curve spends the first frames barely moving and
+ * then crosses most of the colour in the middle, so at sixty frames a second it arrives in a
+ * handful of visible steps. A longer tween only spreads the same steps out, and an eased one
+ * is worse the shorter it is; a constant rate gives every frame an equal share of the change,
+ * which is the smoothest a fade this small can be.
+ */
+@Composable
+fun <T> ChoiceRow(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = MaterialTheme.shapes.small
+
+    Row(modifier = modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+        options.forEach { option ->
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
+            val highlight by animateFloatAsState(
+                targetValue = if (hovered) 1f else 0f,
+                animationSpec = tween(durationMillis = CHOICE_FADE_MS, easing = LinearEasing),
+                label = "choice-highlight",
+            )
+
+            val isSelected = option == selected
+            val background =
+                when {
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    else ->
+                        // One colour for the whole segment: the surface, moved towards the
+                        // ink by the faded amount.
+                        lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.primary, highlight * HOVER_TINT)
+                }
+
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(background)
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            shape = shape,
+                        )
+                        .hoverable(interaction)
+                        .selectable(
+                            selected = isSelected,
+                            role = Role.RadioButton,
+                            interactionSource = interaction,
+                            indication = null,
+                            onClick = { onSelect(option) },
+                        )
+                        .padding(horizontal = Space.m, vertical = Space.s),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label(option),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+/** How long an option takes to reach its hover colour, at a constant rate. */
+private const val CHOICE_FADE_MS = 120
+
+/** How far an unselected option moves towards the ink while the pointer is over it. */
+private const val HOVER_TINT = 0.10f
 
 /** A failure or a result, in the colour that says which it is. */
 @Composable

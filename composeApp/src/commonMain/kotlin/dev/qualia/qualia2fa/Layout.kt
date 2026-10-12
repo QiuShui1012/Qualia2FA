@@ -31,6 +31,17 @@ val ShortHeight = 360.dp
  */
 val MinimalHeight = 240.dp
 
+/**
+ * From this width a form puts two of its short fields on one row.
+ *
+ * It is the same idea as [CompactWidth] one level down: below it, a half-width field is
+ * narrower than its own label needs and the label is ellipsized away, so the fields stack.
+ */
+val FormTwoColumnWidth = 420.dp
+
+/** Whether a form of this width has room for two fields on a row. */
+fun formHasTwoColumns(width: Dp): Boolean = width >= FormTwoColumnWidth
+
 /** Whether a window of this size is wider than it is tall. */
 fun isLandscape(width: Dp, height: Dp): Boolean = width > height
 
