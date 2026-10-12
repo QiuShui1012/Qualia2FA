@@ -9,8 +9,9 @@ English version: [README.en.md](README.en.md).
 
 | 项 | 值 |
 |---|---|
-| 平台 | Windows 桌面、Android、iOS |
+| 平台 | Windows 桌面（已实现）；Android、iOS 计划中 |
 | 界面 | Compose Multiplatform |
+| 界面语言 | 英文（默认）、中文 |
 | 许可证 | Apache-2.0 |
 
 ## 设计取向
@@ -24,14 +25,23 @@ English version: [README.en.md](README.en.md).
 
 ## 当前状态
 
-**开发早期。** 核心库（TOTP/HOTP 计算、`otpauth://` 解析、加密保险库、设备身份、
-二维码配对、恢复密钥）已完成并有测试覆盖；界面尚未开始。目前还不能作为日常使用的
-2FA 应用。
+**开发早期，目前只有 Windows 桌面端。** 已经能用的部分：
 
-## 依赖从哪里来
+- **首次运行**：创建保险库（设备身份与主密钥交给平台密钥库，并如实报告拿到的是
+  TPM 还是软件库），或者从另一台已解锁的设备配对登录
+- **条目**：手动增 / 改 / 删，以及从一张 `otpauth://` 二维码图片导入
+- **验证码**：实时显示、倒计时环、一键复制（30 秒后自动清空剪贴板，且只清掉自己写进去的那份）
+- **配对**：两侧界面都在；配对码可以画成二维码，也可以从图片读回来，文本始终留在码下面
+- **同步**：两台设备各出示一个同步码、一次走一个方向；两边不一致的地方逐个交给用户裁决
+- **恢复密钥**：导出与导入
+- **锁定**：窗口失焦即锁，另有 15 分钟绝对超时；锁定时主密钥材料被释放、剪贴板被清空
 
-本仓库**不含任何 submodule**。Rust 各层都在自己的仓库里开发、发布到 crates.io，
-应用这一侧按版本依赖它们：
+还没有的：局域网 / 热点同步、多账号、主密钥轮换、Android 与 iOS。
+
+## 构建与运行
+
+本仓库**不含任何 submodule**。Rust 各层都在自己的仓库里开发、发布到 crates.io，应用这一侧
+按版本依赖它们：
 
 | crate | 内容 | 许可证 |
 |---|---|---|
@@ -40,13 +50,23 @@ English version: [README.en.md](README.en.md).
 | `qualia2fa-ffi` | 把核心库暴露为 UniFFI 绑定（Kotlin / Swift），并附带绑定生成器 | LGPL-3.0-or-later |
 | `qualia-transport` | 传输通道：二维码这一半（容量模型、编码、渲染、文本信封、图像解码）已实现 | LGPL-3.0-or-later |
 
+构建需要 JDK 21 与 Rust 工具链（Windows 上是 MSVC）：
+
 ```bash
 git clone https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
+
+./gradlew :composeApp:jvmTest      # 编译 + 跑单元测试（含打通 Rust 库的往返测试）
+./gradlew :composeApp:run          # 起桌面应用
+./gradlew :composeApp:packageMsi   # 打包（jlink + jpackage）
 ```
 
-界面代码尚未落地，因此现在还没有一条「构建出应用」的命令。要单独构建某一层，进它
-自己的仓库里做：
+应用构建的是**已发布**的 `qualia2fa-ffi`：源码在配置阶段从 crates.io 取下来、按索引里的
+SHA-256 校验后解包进 git 忽略的 `composeApp/rust/`。换版本时**必须同时换掉
+`ffiCrateSha256`**：只改版本号会在校验那一步失败，这是故意的，它挡住了「版本号写着新、
+实际拿到旧包」这类静默错配。
+
+要单独构建某一层，进它自己的仓库里做：
 
 ```bash
 cargo test --all-targets        # Qualia2FA-Core
@@ -58,17 +78,29 @@ cargo test --all-targets        # QualiaTransport
 ## 目录结构
 
 ```
-.
-└── （界面代码将直接建在本仓库根目录下）
+composeApp/
+├── src/commonMain/             界面与业务代码（Kotlin，跨平台）
+│   ├── composeResources/       界面文案：values/ 英文（默认）、values-zh/ 中文
+│   └── kotlin/dev/qualia/qualia2fa/
+├── src/jvmMain/                桌面端实现：文件存储、文件对话框、窗口与失焦锁定
+└── src/jvmTest/                单元测试
 ```
 
-四个 Rust 层各有自己的仓库，本仓库不再以 submodule 的形式引入它们，也不再保存它们
-的副本。
+`Qualia.kt` 是全仓唯一 import 生成绑定的文件：界面只看到普通的 Kotlin 值，绑定层要换、
+要打补丁或 fork 时只动这一个文件。
+
+## 界面语言
+
+文案放在 `composeApp/src/commonMain/composeResources/`：`values/` 是默认语言（英文），
+`values-zh/` 是中文翻译。默认跟随系统语言，两个主界面上都能手动切换，选择记在数据目录
+下的 `settings.properties` 里。
+
+`StringsTest` 会比较两份文案的键集合：漏掉一条翻译在运行时只会静默回退到英文，只有这个
+比较能发现它。
 
 ## 参与贡献
 
-界面代码尚未开始，因此现在最适合参与的是设计讨论与各层自身的完善。开始之前请
-注意三条硬约束：
+三条硬约束，动手之前请先看一眼：
 
 - **密码学实现不接受「看起来能跑」的改动。** 一切以规范正文的测试向量为准。
   核心库已有 RFC 4226 / 6238 / 4648 / 9106 的向量测试，新增实现必须同样有出处。
@@ -76,12 +108,7 @@ cargo test --all-targets        # QualiaTransport
 - **不得静默降级。** 硬件密钥库不可用时必须如实上报，由用户决定是否接受较弱的
   保护，而不是悄悄换成软件密钥。
 
-### 初始化开发环境
-
-```bash
-git clone https://github.com/Qualia2FA/Qualia2FA
-cd Qualia2FA
-```
+改界面文案时记得**两份都要改**（英文与中文），否则用户看到的是回退后的英文。
 
 ## 许可证
 

@@ -2,15 +2,16 @@
 
 A **serverless, non-realtime** multi-platform two-factor authentication (2FA) app.
 
+中文版见 [README.md](README.md).
+
 Each device runs on its own: no vendor server, no account, no master password. Devices
 signed in to the same account can share 2FA entries directly, and merging takes the union.
 
-中文版见 [README.md](README.md).
-
 | Item | Value |
 |---|---|
-| Platforms | Windows desktop, Android, iOS |
+| Platforms | Windows desktop (implemented); Android and iOS are planned |
 | UI | Compose Multiplatform |
+| Interface languages | English (default), Chinese |
 | License | Apache-2.0 |
 
 ## Design choices
@@ -27,11 +28,27 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 
 ## Current state
 
-**Early development.** The core library (TOTP/HOTP, `otpauth://` parsing, the encrypted
-vault, device identity, QR pairing, recovery keys) is complete and covered by tests; the
-UI has not started. It is not yet usable as a daily 2FA app.
+**Early development, Windows desktop only so far.** What already works:
 
-## Where the dependencies come from
+- **First run**: create a vault (the device identity and the master key go to the platform
+  key store, which is reported as it is — TPM or software), or log in by pairing with a
+  device that is already unlocked
+- **Entries**: add, edit and delete by hand, and import one from an `otpauth://` QR code in
+  an image
+- **Codes**: live display, countdown ring, one-click copy (the clipboard is cleared again
+  after 30 seconds, and only if it still holds what was copied)
+- **Pairing**: both sides have their screens; a pairing code can be drawn as a QR code and
+  read back out of an image, and the text always stays underneath the code
+- **Syncing**: two devices show one code each, one direction at a time; wherever the two
+  disagree, the user decides entry by entry
+- **Recovery keys**: export and import
+- **Locking**: losing focus locks the vault, there is a 15-minute absolute timeout, and
+  locking releases the key material and clears the clipboard
+
+Not there yet: LAN and hotspot syncing, multiple accounts, master key rotation, Android and
+iOS.
+
+## Building and running
 
 This repository has **no submodules**. Each Rust layer is developed in its own repository
 and published to crates.io; the app side depends on them by version:
@@ -43,13 +60,24 @@ and published to crates.io; the app side depends on them by version:
 | `qualia2fa-ffi` | UniFFI bindings (Kotlin / Swift) plus the binding generator | LGPL-3.0-or-later |
 | `qualia-transport` | Transport channels: the QR half (capacity model, encoding, rendering, text envelope, image decoding) is implemented | LGPL-3.0-or-later |
 
+Building needs JDK 21 and a Rust toolchain (MSVC on Windows):
+
 ```bash
 git clone https://github.com/Qualia2FA/Qualia2FA
 cd Qualia2FA
+
+./gradlew :composeApp:jvmTest      # compile and run the unit tests, including round trips into the Rust library
+./gradlew :composeApp:run          # start the desktop application
+./gradlew :composeApp:packageMsi   # package it (jlink + jpackage)
 ```
 
-The UI code does not exist yet, so there is no "build the app" command. To build one layer
-on its own, work inside its own repository:
+The application builds the **published** `qualia2fa-ffi`: during configuration the source is
+fetched from crates.io, checked against the SHA-256 the registry index publishes, and
+unpacked into the git-ignored `composeApp/rust/`. When the version changes, **`ffiCrateSha256`
+has to change with it**: changing only the version number fails at that check, which is
+deliberate — it stops "the number says new, the package is old" from passing silently.
+
+To build one layer on its own, work inside its own repository:
 
 ```bash
 cargo test --all-targets        # Qualia2FA-Core
@@ -61,40 +89,50 @@ cargo test --all-targets        # QualiaTransport
 ## Repository layout
 
 ```
-.
-└── (the UI code will live at the root of this repository)
+composeApp/
+├── src/commonMain/             UI and business code (Kotlin, multiplatform)
+│   ├── composeResources/       Interface text: values/ English (default), values-zh/ Chinese
+│   └── kotlin/dev/qualia/qualia2fa/
+├── src/jvmMain/                Desktop implementation: file storage, file dialogs, the window and locking on focus loss
+└── src/jvmTest/                Unit tests
 ```
 
-Each of the four Rust layers has its own repository; this one no longer pulls them in as
-submodules and keeps no copy of them.
+`Qualia.kt` is the only file in the repository that imports the generated bindings: the UI
+sees ordinary Kotlin values, so replacing, patching or forking the binding layer touches that
+one file.
+
+## Interface languages
+
+The text lives in `composeApp/src/commonMain/composeResources/`: `values/` is the default
+locale (English) and `values-zh/` is the Chinese translation. The language follows the system
+by default and can be switched on either main screen; the choice is kept in
+`settings.properties` in the data directory.
+
+`StringsTest` compares the key sets of the two catalogues: a missing translation falls back to
+English silently at runtime, and that comparison is the only thing that catches it.
 
 ## Contributing
 
-The UI has not started, so the most useful contributions right now are design discussion
-and work on the layers themselves. Three hard constraints before you start:
+Three hard constraints before you start:
 
-- **A cryptographic implementation is judged by the test vectors in the specification**,
-  not by "it seems to produce codes". The core library already has RFC 4226 / 6238 / 4648 /
-  9106 vector tests; a new implementation needs a citation of the same kind.
-- **Secret material must not reach logs, error messages or persisted plaintext.** This is
-  not negotiable.
-- **No silent downgrade.** When the hardware keystore is unavailable it has to be reported
-  as such, and the user decides whether to accept weaker protection, rather than quietly
-  falling back to a software key.
+- **A cryptographic implementation is judged by the test vectors in the specification**, not
+  by "it seems to produce codes". The core library already has RFC 4226 / 6238 / 4648 / 9106
+  vector tests; a new implementation needs a citation of the same kind.
+- **Secret material must not reach logs, error messages or persisted plaintext.** This is not
+  negotiable.
+- **No silent downgrade.** When the hardware keystore is unavailable it has to be reported as
+  such, and the user decides whether to accept weaker protection, rather than quietly falling
+  back to a software key.
 
-### Setting up
-
-```bash
-git clone https://github.com/Qualia2FA/Qualia2FA
-cd Qualia2FA
-```
+When you change interface text, change **both** catalogues (English and Chinese), or users see
+the English fallback.
 
 ## License
 
 The application itself is under the Apache License 2.0; see [`LICENSE`](LICENSE) and
 [`NOTICE`](NOTICE).
 
-The four Rust layers (`qualia-dik`, `qualia2fa-core`, `qualia2fa-ffi`,
-`qualia-transport`) are under LGPL-3.0-or-later. The combination is deliberate: the app
-layer stays permissively licensed for easy distribution and reuse, while the cryptographic
-core stays copyleft, so any modification has to be given back.
+The four Rust layers (`qualia-dik`, `qualia2fa-core`, `qualia2fa-ffi`, `qualia-transport`) are
+under LGPL-3.0-or-later. The combination is deliberate: the app layer stays permissively
+licensed for easy distribution and reuse, while the cryptographic core stays copyleft, so any
+modification has to be given back.
