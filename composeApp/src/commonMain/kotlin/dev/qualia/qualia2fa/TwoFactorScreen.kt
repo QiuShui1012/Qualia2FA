@@ -423,10 +423,16 @@ fun TwoFactorScreen(
  *
  * # What the card shows
  *
- * The name with its service beside it, the code, when it changes, and one row of actions at
- * the bottom right with the countdown ring at its left end. The account and the algorithm are
- * deliberately **not** shown: they are what the editor is for, and on a card that is now one
- * column of several they cost a line each for something the user reads once.
+ * Three lines, each with one thing to read on the left and the action that belongs to it on
+ * the right: the name with its service beside it and **copy**, the code and **edit**, and when
+ * the code changes next with the countdown ring and **delete**. The destructive action ends up
+ * on the bottom line, where it belongs, and the ring sits immediately to its left — what is
+ * counting down and what would destroy it are read together rather than the ring floating
+ * beside the code.
+ *
+ * The account and the algorithm are deliberately **not** shown: they are what the editor is
+ * for, and on a card that is one column of several they would cost a line each for something
+ * the user reads once.
  */
 @Composable
 private fun EntryCard(
@@ -442,6 +448,7 @@ private fun EntryCard(
     val period = entry.periodSeconds.coerceAtLeast(1)
     val remaining = period - (now % period)
     val service = entry.issuer.takeIf { it.isNotBlank() }
+    val changing = code != null && !entry.isCounterBased
 
     Card(
         modifier =
@@ -482,45 +489,57 @@ private fun EntryCard(
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
-                Text(entry.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.alignByBaseline())
-                if (service != null) {
-                    Text("·", style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
-                    Text(service, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
-                }
-            }
 
-            if (selected == null) {
-                Text(
-                    text = code?.chunked(3)?.joinToString(" ") ?: "------",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontFamily = FontFamily.Monospace,
-                )
-                if (code != null && !entry.isCounterBased) {
-                    Text(
-                        stringResource(Res.string.code_changes_in, remaining),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                // The bottom row, right-aligned: the ring at its left end, then the actions
-                // with the destructive one last, which is where a delete belongs.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = Space.s),
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(Space.xs),
                 ) {
-                    if (code != null && !entry.isCounterBased) {
-                        CircularProgressIndicator(
-                            progress = { remaining.toFloat() / period.toFloat() },
-                            modifier = Modifier.size(Sizes.ring).padding(end = Space.s),
-                        )
+                    Text(entry.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.alignByBaseline())
+                    if (service != null) {
+                        Text("·", style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
+                        Text(service, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
                     }
+                }
+
+                if (selected == null) {
                     CompactTextButton(
                         label = stringResource(Res.string.action_copy),
                         enabled = code != null,
                         onClick = { code?.let(onCopy) },
                     )
+                }
+            }
+
+            if (selected == null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = code?.chunked(3)?.joinToString(" ") ?: "------",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.weight(1f),
+                    )
                     CompactTextButton(label = stringResource(Res.string.action_edit), onClick = onEdit)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (changing) stringResource(Res.string.code_changes_in, remaining) else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (changing) {
+                        CircularProgressIndicator(
+                            progress = { remaining.toFloat() / period.toFloat() },
+                            modifier = Modifier.size(Sizes.ring).padding(end = Space.s),
+                        )
+                    }
                     CompactTextButton(label = stringResource(Res.string.action_delete), onClick = onDelete)
                 }
             }
