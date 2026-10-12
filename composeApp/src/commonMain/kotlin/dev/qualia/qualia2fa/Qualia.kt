@@ -20,7 +20,12 @@ interface MasterKeyStore {
     /** The 32-byte master key, or `null` when this device was never registered. */
     fun load(): ByteArray?
 
-    /** Writes the master key, overwriting any existing value. */
+    /**
+     * Writes the master key, overwriting any existing value.
+     *
+     * The store **must copy** the bytes: the caller wipes its own buffer as soon as this
+     * returns, so keeping the reference would leave the store holding zeros.
+     */
     fun store(key: ByteArray)
 
     /** Deletes the master key; deleting a missing key is not an error. */
@@ -213,6 +218,8 @@ object Qualia {
             val key = randomBytes(MASTER_KEY_BYTES)
             val vault = Vault(FfiVault.fromMasterKey(key))
             store.store(key)
+            // The store keeps its own copy; this one does not outlive the call.
+            wipe(key)
             vault
         } catch (_: Exception) {
             null

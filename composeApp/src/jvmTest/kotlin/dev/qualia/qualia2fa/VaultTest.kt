@@ -13,7 +13,8 @@ private class MemoryStore(initial: ByteArray? = null) : MasterKeyStore {
     override fun load(): ByteArray? = key
 
     override fun store(key: ByteArray) {
-        this.key = key
+        // The contract requires a copy: the caller wipes its buffer right after this.
+        this.key = key.copyOf()
     }
 
     override fun delete() {

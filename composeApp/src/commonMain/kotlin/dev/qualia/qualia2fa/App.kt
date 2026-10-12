@@ -38,12 +38,25 @@ import kotlinx.coroutines.delay
  *
  * It shows either the first-run choice or the entry list, depending on whether this
  * device already holds a master key and a vault.
+ *
+ * [blurCount] increases every time the window loses focus; any increase locks the vault,
+ * because a two-factor code left on screen is a code somebody else can read. The vault is
+ * also locked after [SESSION_TIMEOUT_SECONDS] regardless of activity, and locking drops
+ * the only reference to the key material, which is wiped by the Rust side when it is
+ * dropped.
  */
 @Composable
-fun App(storage: VaultStorage) {
+fun App(storage: VaultStorage, blurCount: Int = 0) {
     MaterialTheme {
         var vault by remember { mutableStateOf<Vault?>(null) }
         var status by remember { mutableStateOf("正在打开本机保险库…") }
+        val clipboard = LocalClipboardManager.current
+
+        fun lock(reason: String) {
+            vault = null
+            status = reason
+            clipboard.setText(AnnotatedString(""))
+        }
 
         LaunchedEffect(Unit) {
             val store = storage.masterKeyStore
@@ -57,6 +70,18 @@ fun App(storage: VaultStorage) {
             if (vault != null) {
                 status = "已解锁"
             }
+        }
+
+        LaunchedEffect(blurCount) {
+            if (blurCount > 0 && vault != null) {
+                lock("窗口失去焦点，已锁定")
+            }
+        }
+
+        LaunchedEffect(vault) {
+            if (vault == null) return@LaunchedEffect
+            delay(SESSION_TIMEOUT_SECONDS * 1_000L)
+            lock("超过 $SESSION_TIMEOUT_SECONDS 秒未解锁，已锁定")
         }
 
         val current = vault
@@ -73,14 +98,14 @@ fun App(storage: VaultStorage) {
             VaultScreen(
                 vault = current,
                 storage = storage,
-                onLock = {
-                    vault = null
-                    status = "已锁定"
-                },
+                onLock = { lock("已锁定") },
             )
         }
     }
 }
+
+/** How long an unlocked vault stays unlocked with no way for the user to extend it. */
+private const val SESSION_TIMEOUT_SECONDS = 900
 
 @Composable
 private fun FirstRunScreen(
