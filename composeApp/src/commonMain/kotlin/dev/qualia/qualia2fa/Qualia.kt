@@ -8,6 +8,7 @@ import dev.qualia.qualia2fa.ffi.FfiJoiner
 import dev.qualia.qualia2fa.ffi.FfiLogin
 import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
 import dev.qualia.qualia2fa.ffi.FfiSecureStore
+import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
 import dev.qualia.qualia2fa.ffi.qrDecode as ffiQrDecode
 import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
 import dev.qualia.qualia2fa.ffi.FfiVault
@@ -358,6 +359,27 @@ object Qualia {
             null
         }
 
+    /**
+     * Reads an `otpauth://` link, which is what a scanned entry code carries.
+     *
+     * Returns `null` when the text is not such a link or its parameters are rejected.
+     * The entry's display name is the caller's to choose: the link carries an issuer and
+     * an account, not a name.
+     */
+    fun parseOtpAuth(uri: String): OtpAuthLink? =
+        try {
+            val parsed = ffiParseOtpAuthUri(uri)
+            OtpAuthLink(
+                issuer = parsed.issuer.orEmpty(),
+                account = parsed.account,
+                secretBase32 = parsed.secretBase32,
+                digits = if (parsed.digits == FfiDigits.EIGHT) 8 else 6,
+                periodSeconds = parsed.period.toLong(),
+            )
+        } catch (_: Exception) {
+            null
+        }
+
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32
 
@@ -492,6 +514,20 @@ class PairingJoiner internal constructor(
  * Plain values only: the generated record does not leave this file.
  */
 class QrImage(val width: Int, val height: Int, val pixels: ByteArray)
+
+/**
+ * What an `otpauth://` link says, as plain values.
+ *
+ * There is no name here on purpose: the link carries an issuer and an account, and what
+ * to call the entry is the user's choice.
+ */
+data class OtpAuthLink(
+    val issuer: String,
+    val account: String,
+    val secretBase32: String,
+    val digits: Int,
+    val periodSeconds: Long,
+)
 
 /**
  * Adapts the facade's store interface to the one the binding layer expects.

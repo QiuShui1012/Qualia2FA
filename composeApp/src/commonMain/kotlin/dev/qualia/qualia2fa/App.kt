@@ -248,6 +248,36 @@ private fun VaultScreen(
         )
 
         TextButton(onClick = { adding = true }) { Text("添加条目") }
+        TextButton(onClick = {
+            val image = pickGrayImage()
+            if (image == null) {
+                message = "没有读到图片（取消，或者文件无法解码）。"
+            } else {
+                val text = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
+                val link = text?.let { Qualia.parseOtpAuth(it) }
+                if (link == null) {
+                    message = "这张图片里没有可读的条目码（需要 otpauth:// 二维码）。"
+                } else {
+                    val id = vault.addEntry(
+                        name = link.issuer.ifBlank { link.account }.ifBlank { "导入的条目" },
+                        issuer = link.issuer,
+                        account = link.account,
+                        secretBase32 = link.secretBase32,
+                        digits = link.digits,
+                        periodSeconds = link.periodSeconds,
+                        note = "",
+                        unixTime = currentTimeSeconds(),
+                    )
+                    if (id == null) {
+                        message = "条目没有被接受：种子或参数不合法。"
+                    } else {
+                        vault.serialize()?.let(storage::saveVault)
+                        entries = vault.entries()
+                        message = "已导入条目。"
+                    }
+                }
+            }
+        }) { Text("扫码导入条目") }
         TextButton(onClick = { pairing = true }) { Text("配对新设备") }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
