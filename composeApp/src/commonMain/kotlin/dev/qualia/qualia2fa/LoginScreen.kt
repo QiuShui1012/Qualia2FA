@@ -1,6 +1,7 @@
 package dev.qualia.qualia2fa
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -96,13 +97,21 @@ fun LoginScreen(
                 }
             }
         } else {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(Space.xl).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Space.xl),
+            // Centred inside a box that scrolls: centred when the window has room, and
+            // reachable in full when it does not, which a centred column on its own is not
+            // — a scrollable column is only as tall as its content.
+            Box(
+                modifier = Modifier.fillMaxSize().padding(Space.xl),
+                contentAlignment = Alignment.Center,
             ) {
-                Brand(showTitle = layout.showTitle)
-                Actions(mode, reason, hardwareBacked, message, language, onSelectLanguage, onCreateVault, onJoin, onUnlock)
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Space.xl),
+                ) {
+                    Brand(showTitle = layout.showTitle)
+                    Actions(mode, reason, hardwareBacked, message, language, onSelectLanguage, onCreateVault, onJoin, onUnlock)
+                }
             }
         }
     }
