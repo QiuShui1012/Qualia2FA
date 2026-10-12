@@ -6,14 +6,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
@@ -288,7 +290,14 @@ fun TwoFactorScreen(
             Hint(stringResource(Res.string.two_factor_empty))
         }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+        LazyVerticalGrid(
+            // As many cards of at least this width as the window holds: the number of columns
+            // follows the window rather than being fixed, and a card in a partly filled last
+            // row keeps the width of the ones above it.
+            columns = GridCells.Adaptive(minSize = MinEntryCardWidth),
+            verticalArrangement = Arrangement.spacedBy(Space.s),
+            horizontalArrangement = Arrangement.spacedBy(Space.s),
+        ) {
             items(entries, key = { it.id }) { entry ->
                 EntryCard(
                     entry = entry,
@@ -409,8 +418,15 @@ fun TwoFactorScreen(
  * One entry.
  *
  * [selected] is `null` outside selection mode: the same card then carries the code and the
- * per-entry actions, and in selection mode it carries a box and toggles instead — one row
+ * per-entry actions, and in selection mode it carries a box and toggles instead — one card
  * that cannot be in two modes at once, which the type says.
+ *
+ * # What the card shows
+ *
+ * The name with its service beside it, the code, when it changes, and one row of actions at
+ * the bottom right with the countdown ring at its left end. The account and the algorithm are
+ * deliberately **not** shown: they are what the editor is for, and on a card that is now one
+ * column of several they cost a line each for something the user reads once.
  */
 @Composable
 private fun EntryCard(
@@ -425,6 +441,7 @@ private fun EntryCard(
 ) {
     val period = entry.periodSeconds.coerceAtLeast(1)
     val remaining = period - (now % period)
+    val service = entry.issuer.takeIf { it.isNotBlank() }
 
     Card(
         modifier =
@@ -434,7 +451,7 @@ private fun EntryCard(
                     if (selected == null) {
                         Modifier
                     } else {
-                        // A checkbox rather than a clickable row: a screen reader then says
+                        // A checkbox rather than a clickable card: a screen reader then says
                         // whether the entry is selected instead of only that it can be tapped.
                         Modifier.toggleable(
                             value = selected,
@@ -445,69 +462,86 @@ private fun EntryCard(
                 ),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(Space.l),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.m),
+            verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
-            if (selected != null) {
-                Icon(
-                    painter =
-                        painterResource(
-                            if (selected) Res.drawable.icon_selected else Res.drawable.icon_select,
-                        ),
-                    contentDescription = null,
-                    modifier = Modifier.size(Sizes.navIcon),
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-
-            Column(Modifier.weight(1f)) {
-                Text(entry.name, style = MaterialTheme.typography.titleMedium)
-                val subtitle =
-                    listOfNotNull(
-                        entry.issuer.takeIf { it.isNotBlank() },
-                        entry.account.takeIf { it.isNotBlank() },
-                        // Shown only when it is not the default: a SHA-1 entry is what the
-                        // scheme assumes, and saying so on every row would be noise. A
-                        // SHA-256 row says so, because that is the answer to "why is this
-                        // code rejected".
-                        entry.algorithm.takeIf { it != OtpAlgorithm.Sha1 }?.label,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.xs),
+            ) {
+                if (selected != null) {
+                    Icon(
+                        painter =
+                            painterResource(
+                                if (selected) Res.drawable.icon_selected else Res.drawable.icon_select,
+                            ),
+                        contentDescription = null,
+                        modifier = Modifier.size(Sizes.navIcon),
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
-                if (subtitle.isNotEmpty()) {
-                    Text(subtitle.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
                 }
-                if (selected == null) {
-                    Text(
-                        text = code?.chunked(3)?.joinToString(" ") ?: "------",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                    if (code != null && !entry.isCounterBased) {
-                        Text(
-                            stringResource(Res.string.code_changes_in, remaining),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+                Text(entry.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.alignByBaseline())
+                if (service != null) {
+                    Text("·", style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
+                    Text(service, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
                 }
             }
 
             if (selected == null) {
+                Text(
+                    text = code?.chunked(3)?.joinToString(" ") ?: "------",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
                 if (code != null && !entry.isCounterBased) {
-                    CircularProgressIndicator(
-                        progress = { remaining.toFloat() / period.toFloat() },
-                        modifier = Modifier.size(Sizes.ring),
+                    Text(
+                        stringResource(Res.string.code_changes_in, remaining),
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { code?.let(onCopy) }, enabled = code != null) {
-                        Text(stringResource(Res.string.action_copy))
+
+                // The bottom row, right-aligned: the ring at its left end, then the actions
+                // with the destructive one last, which is where a delete belongs.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = Space.s),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    if (code != null && !entry.isCounterBased) {
+                        CircularProgressIndicator(
+                            progress = { remaining.toFloat() / period.toFloat() },
+                            modifier = Modifier.size(Sizes.ring).padding(end = Space.s),
+                        )
                     }
-                    TextButton(onClick = onEdit) { Text(stringResource(Res.string.action_edit)) }
-                    TextButton(onClick = onDelete) { Text(stringResource(Res.string.action_delete)) }
+                    CompactTextButton(
+                        label = stringResource(Res.string.action_copy),
+                        enabled = code != null,
+                        onClick = { code?.let(onCopy) },
+                    )
+                    CompactTextButton(label = stringResource(Res.string.action_edit), onClick = onEdit)
+                    CompactTextButton(label = stringResource(Res.string.action_delete), onClick = onDelete)
                 }
             }
         }
+    }
+}
+
+/**
+ * A text button with the padding of an action rather than of a dialog button.
+ *
+ * Several of them share the bottom of a card that is now one column of several, and the
+ * default padding of a text button is sized for a row of two across a whole screen.
+ */
+@Composable
+private fun CompactTextButton(label: String, onClick: () -> Unit, enabled: Boolean = true) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = Space.s, vertical = Space.xs),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 

@@ -42,6 +42,17 @@ val FormTwoColumnWidth = 420.dp
 /** Whether a form of this width has room for two fields on a row. */
 fun formHasTwoColumns(width: Dp): Boolean = width >= FormTwoColumnWidth
 
+/**
+ * The narrowest an entry card may be.
+ *
+ * A card holds a name with its service beside it, a code eight digits wide in the code style,
+ * and one row of actions with the countdown ring. Under this width one of those stops fitting
+ * — the code is the widest and the least negotiable, since a code that wraps is unreadable.
+ * The list lays out as many cards of at least this width as fit, so the number of columns
+ * follows the window rather than a fixed count.
+ */
+val MinEntryCardWidth = 280.dp
+
 /** Whether a window of this size is wider than it is tall. */
 fun isLandscape(width: Dp, height: Dp): Boolean = width > height
 
