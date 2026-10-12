@@ -110,4 +110,43 @@
     <!-- 语言 -->
     <string name="settings_language">语言</string>
     <string name="language_system">跟随系统语言</string>
+
+    <!-- 同步：两台设备各出一个码，一次一个方向 -->
+    <string name="action_sync">同步</string>
+    <string name="sync_intro">同步用码在两个方向上各走一次：一台设备出示同步码，另一台读入并合并它带来的内容。全程不经过任何服务器，走动的只有那些码。</string>
+    <string name="sync_error_no_device_identity">这台设备没有平台身份，无法同步。它当初是以「本机保险库」创建的，不能配对或同步。</string>
+    <string name="sync_my_code_explainer">把这个码交给另一台设备。合并之后请重新生成一次：交出去的是生成那一刻的状态。</string>
+    <string name="action_generate_code">生成同步码</string>
+    <string name="action_show_my_code">出示我的同步码</string>
+    <string name="sync_read_explainer">读入对方的同步码：贴在下面，或者打开它保存成的图片。</string>
+    <string name="field_peer_code">对方的同步码</string>
+    <string name="action_read_code_from_image">从图片读取同步码</string>
+    <string name="action_merge">合并</string>
+    <string name="sync_message_code_read">已从图片读入同步码。</string>
+    <string name="sync_error_no_code_in_image">这张图片里没有可读的同步码。</string>
+    <string name="sync_error_code_rejected">这个码没有被接受：它不是同步码，或者不属于这个账号。</string>
+    <string name="sync_error_already_applied">这个码已经合并过了。</string>
+    <string name="sync_error_sender_mismatch">这个码声称的来源没有得到通道确认，已拒绝。</string>
+    <string name="sync_error_nothing_to_read">没有可读的内容：先贴入或读入对方的同步码。</string>
+    <string name="sync_error_authentication_failed">这个码没有通过认证：它不是用这个账号的主密钥写出来的。</string>
+    <string name="sync_error_other">这个码没能合并。</string>
+    <string name="sync_error_not_saved">合并结果没能保存到本机。</string>
+    <string name="sync_result_nothing_new">没有新内容：这个码里的东西本机都有了。</string>
+    <string name="sync_result_summary">新增 %1$d，墓碑 %2$d，应用删除 %3$d，无变化 %4$d。</string>
+    <string name="sync_result_needs_decision">其中 %1$d 条两边不一致，请在下面裁决。</string>
+    <string name="sync_conflict_heading">需要裁决</string>
+    <string name="sync_conflict_entry_mismatch">两台设备都改过这条条目。</string>
+    <string name="sync_conflict_peer_deleted">对方删除了这条条目；本机还留着它。</string>
+    <string name="sync_conflict_local_deleted">本机删除了这条条目；对方还留着它。</string>
+    <string name="sync_conflict_side_local">本机</string>
+    <string name="sync_conflict_side_incoming">对方</string>
+    <string name="sync_conflict_side_deleted">已删除</string>
+    <string name="sync_conflict_local_is_newer">本机这一版更晚。</string>
+    <string name="action_keep_local">保留本机版本</string>
+    <string name="action_take_incoming">采用对方版本</string>
+    <string name="action_keep_entry">保留条目</string>
+    <string name="action_accept_deletion">接受删除</string>
+    <string name="action_keep_deleted">保持删除</string>
+    <string name="action_restore_entry">恢复条目</string>
+    <string name="sync_error_decision_refused">裁决没能生效，什么都没改动。</string>
 </resources>

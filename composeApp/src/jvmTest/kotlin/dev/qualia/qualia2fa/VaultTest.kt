@@ -6,24 +6,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** A master key store kept in memory, so the tests never touch the user's files. */
-private class MemoryStore(initial: ByteArray? = null) : MasterKeyStore {
-    private var key: ByteArray? = initial
-
-    override fun load(): ByteArray? = key
-
-    override fun store(key: ByteArray) {
-        // The contract requires a copy: the caller wipes its buffer right after this.
-        this.key = key.copyOf()
-    }
-
-    override fun delete() {
-        key = null
-    }
-
-    override val isHardwareBacked: Boolean = false
-}
-
 class VaultTest {
     private val secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 

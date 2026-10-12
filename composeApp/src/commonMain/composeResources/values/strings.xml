@@ -114,4 +114,43 @@
     <!-- Language -->
     <string name="settings_language">Language</string>
     <string name="language_system">Follow the system language</string>
+
+    <!-- Sync: both devices exchange codes, one direction at a time -->
+    <string name="action_sync">Sync</string>
+    <string name="sync_intro">Syncing moves codes in both directions: one device shows a code, the other reads it and merges what it carries. Nothing goes through a server, and the codes are the only thing that travels.</string>
+    <string name="sync_error_no_device_identity">This device has no platform identity, so it cannot sync. It was created as a local-only vault, which cannot pair or sync.</string>
+    <string name="sync_my_code_explainer">Hand this code to the other device. After a merge, generate it again: what you hand over is the state at the moment it was generated.</string>
+    <string name="action_generate_code">Generate the code</string>
+    <string name="action_show_my_code">Show my sync code</string>
+    <string name="sync_read_explainer">Read the other device's code: paste it below, or open the image it was saved as.</string>
+    <string name="field_peer_code">The other device's sync code</string>
+    <string name="action_read_code_from_image">Read the code from an image</string>
+    <string name="action_merge">Merge it</string>
+    <string name="sync_message_code_read">The sync code was read from the image.</string>
+    <string name="sync_error_no_code_in_image">This image holds no readable sync code.</string>
+    <string name="sync_error_code_rejected">This code was not accepted: it is not a sync code, or it does not belong to this account.</string>
+    <string name="sync_error_already_applied">This code was already applied.</string>
+    <string name="sync_error_sender_mismatch">This code claims a sender the channel does not confirm, so it was refused.</string>
+    <string name="sync_error_nothing_to_read">There was nothing to read: paste or scan the other device's code first.</string>
+    <string name="sync_error_authentication_failed">This code did not authenticate: it was not written with this account's master key.</string>
+    <string name="sync_error_other">The code could not be merged.</string>
+    <string name="sync_error_not_saved">The merge could not be saved on this device.</string>
+    <string name="sync_result_nothing_new">Nothing new: this device already had everything that code carried.</string>
+    <string name="sync_result_summary">Added %1$d, tombstones %2$d, deletions applied %3$d, unchanged %4$d.</string>
+    <string name="sync_result_needs_decision">The two devices disagree about %1$d of them; decide below.</string>
+    <string name="sync_conflict_heading">Disagreement</string>
+    <string name="sync_conflict_entry_mismatch">Both devices changed this entry.</string>
+    <string name="sync_conflict_peer_deleted">The other device deleted this entry; this one still has it.</string>
+    <string name="sync_conflict_local_deleted">This device deleted this entry; the other one still has it.</string>
+    <string name="sync_conflict_side_local">This device</string>
+    <string name="sync_conflict_side_incoming">The other device</string>
+    <string name="sync_conflict_side_deleted">Deleted</string>
+    <string name="sync_conflict_local_is_newer">This device's version is the later one.</string>
+    <string name="action_keep_local">Keep this device's version</string>
+    <string name="action_take_incoming">Take the other device's version</string>
+    <string name="action_keep_entry">Keep the entry</string>
+    <string name="action_accept_deletion">Accept the deletion</string>
+    <string name="action_keep_deleted">Keep it deleted</string>
+    <string name="action_restore_entry">Restore the entry</string>
+    <string name="sync_error_decision_refused">The decision could not be applied, so nothing was changed.</string>
 </resources>

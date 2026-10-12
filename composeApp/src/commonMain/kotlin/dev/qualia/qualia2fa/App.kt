@@ -49,6 +49,7 @@ import dev.qualia.qualia2fa.resources.action_join_existing_account
 import dev.qualia.qualia2fa.resources.action_lock
 import dev.qualia.qualia2fa.resources.action_pair_new_device
 import dev.qualia.qualia2fa.resources.action_save
+import dev.qualia.qualia2fa.resources.action_sync
 import dev.qualia.qualia2fa.resources.app_name
 import dev.qualia.qualia2fa.resources.code_changes_in
 import dev.qualia.qualia2fa.resources.core_version_file_key
@@ -317,6 +318,7 @@ private fun VaultScreen(
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Entry?>(null) }
     var pairing by remember { mutableStateOf(false) }
+    var syncing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf<String?>(null) }
@@ -408,6 +410,7 @@ private fun VaultScreen(
             }
         }) { Text(stringResource(Res.string.action_import_entry_from_image)) }
         TextButton(onClick = { pairing = true }) { Text(stringResource(Res.string.action_pair_new_device)) }
+        TextButton(onClick = { syncing = true }) { Text(stringResource(Res.string.action_sync)) }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -434,6 +437,23 @@ private fun VaultScreen(
 
     if (pairing) {
         PairNewDeviceScreen(vault = vault, onDone = { pairing = false })
+    }
+
+    if (syncing) {
+        // The identity is looked up when the screen is opened, not when the list is composed:
+        // it is a platform key store access, and a hardware one on machines that have it.
+        val deviceId = remember { Qualia.deviceId(DEVICE_LABEL) }
+        SyncScreen(
+            vault = vault,
+            deviceId = deviceId,
+            onChanged = {
+                // A merge and a decision both write into the vault, and neither can persist
+                // it: the file belongs to this layer.
+                vault.serialize()?.let(storage::saveVault)
+                entries = vault.entries()
+            },
+            onDone = { syncing = false },
+        )
     }
 
     if (adding || editing != null) {

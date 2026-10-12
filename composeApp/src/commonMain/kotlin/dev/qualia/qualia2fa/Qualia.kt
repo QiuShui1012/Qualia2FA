@@ -1,13 +1,25 @@
 package dev.qualia.qualia2fa
 
 import dev.qualia.qualia2fa.ffi.FfiAlgorithm
-import dev.qualia.qualia2fa.ffi.FfiDigits
+import dev.qualia.qualia2fa.ffi.FfiConflict
+import dev.qualia.qualia2fa.ffi.FfiConflictSide
+import dev.qualia.qualia2fa.ffi.FfiDecision
 import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
+import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiEcLevel
+import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiJoiner
 import dev.qualia.qualia2fa.ffi.FfiLogin
+import dev.qualia.qualia2fa.ffi.FfiPayloadKind
 import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
+import dev.qualia.qualia2fa.ffi.FfiReceivedMessage
+import dev.qualia.qualia2fa.ffi.FfiRecipient
+import dev.qualia.qualia2fa.ffi.FfiRoster
 import dev.qualia.qualia2fa.ffi.FfiSecureStore
+import dev.qualia.qualia2fa.ffi.FfiSyncOutcome
+import dev.qualia.qualia2fa.ffi.FfiSyncSession
+import dev.qualia.qualia2fa.ffi.FfiTransport
+import dev.qualia.qualia2fa.ffi.FfiTransportCapabilities
 import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
 import dev.qualia.qualia2fa.ffi.qrDecode as ffiQrDecode
 import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
@@ -176,6 +188,14 @@ class Vault internal constructor(private val inner: FfiVault) {
         } catch (_: Exception) {
             null
         }
+
+    /**
+     * Opens a synchronization session on this vault.
+     *
+     * Kept here rather than opened from the facade directly: the vault owns the generated
+     * object, and nothing outside this file names a generated type.
+     */
+    internal fun openSession(): FfiSyncSession = FfiSyncSession.open(inner)
 
     private companion object {
         /**
@@ -422,7 +442,342 @@ object Qualia {
      * refused rather than drawn at a size no camera will read.
      */
     private const val QR_MAX_VERSION: UByte = 20u
+
+    /**
+     * This device's identity fingerprint: 64 hexadecimal characters, or `null` when the
+     * platform key store is unavailable.
+     *
+     * It is the identifier the sync channel reports for this device and the value a payload
+     * carries as its sender, so it must be the same one the pairing screen shows.
+     */
+    fun deviceId(label: String): String? =
+        try {
+            FfiPlatformKeys.open(label).deviceId()
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Opens a synchronization session for [vault], claiming [deviceId] on the channel.
+     *
+     * Returns `null` when the session cannot be created. The vault is **mutated** by a merge
+     * and by every decision, so the caller has to serialize it afterwards.
+     */
+    fun syncSession(vault: Vault, deviceId: String): SyncSession? =
+        try {
+            SyncSession(vault.openSession(), CodeChannel(deviceId))
+        } catch (_: Exception) {
+            null
+        }
 }
+
+/**
+ * One device's side of a synchronization over the code channel.
+ *
+ * The channel is the text one: this device's state becomes a text the user carries to the
+ * other device, and what comes back is the other device's text. Nothing here decides
+ * anything about the protocol — the core owns which payload goes first, what a merge does and
+ * what a disagreement means.
+ *
+ * # The vault it works on is mutated
+ *
+ * A merge writes into the vault and a decision writes into it as well, so the caller must
+ * persist it ([Vault.serialize]) after either one, or the result is lost when the process
+ * ends.
+ */
+class SyncSession internal constructor(
+    private val inner: FfiSyncSession,
+    private val channel: CodeChannel,
+) {
+    /**
+     * This device's state as the text to show, or `null` when it cannot be produced.
+     *
+     * What it carries is the state **at the moment it was generated**, so the caller should
+     * generate it again after a merge before handing it over.
+     */
+    fun myCodeText(): String? =
+        try {
+            inner.send(channel, FfiRecipient.All, FfiPayloadKind.VAULT)
+            channel.takeOutgoing()?.let { payload -> syncCodeText(channel.deviceId, payload) }
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Merges the other device's code.
+     *
+     * The text is refused when it is not a sync code, and the merge is refused when the code
+     * does not belong to this account or was already applied; both come back as
+     * [SyncMerge.Refused] rather than as an exception, because both are normal outcomes of a
+     * user typing or scanning something.
+     */
+    fun mergeText(text: String): SyncMerge {
+        val code = parseSyncCode(text) ?: return SyncMerge.Refused(SyncRefusal.NotACode)
+        channel.accept(code.sender, code.payload)
+        return try {
+            SyncMerge.Merged(inner.receive(channel).toOutcome())
+        } catch (error: FfiException) {
+            SyncMerge.Refused(refusalOf(error))
+        } catch (_: Exception) {
+            SyncMerge.Refused(SyncRefusal.Other)
+        }
+    }
+
+    /** The disagreements still waiting for a decision. */
+    fun conflicts(): List<SyncConflict> =
+        try {
+            inner.pendingConflicts().map { it.toConflict() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /**
+     * Applies one decision, which is what finally closes a disagreement.
+     *
+     * [entryId] is the conflict's identifier rather than a position: a position shifts as soon
+     * as one conflict is decided. Returns false when the decision was refused, in which case
+     * the vault is unchanged and the conflict stays pending.
+     */
+    fun decide(entryId: String, takeIncoming: Boolean): Boolean =
+        try {
+            inner.adjudicate(entryId, if (takeIncoming) FfiDecision.TAKE_INCOMING else FfiDecision.KEEP_LOCAL)
+            true
+        } catch (_: Exception) {
+            false
+        }
+}
+
+/** What one merge produced. */
+sealed interface SyncMerge {
+    /** The code was merged; [outcome] says what it changed. */
+    data class Merged(val outcome: SyncOutcome) : SyncMerge
+
+    /** The code was refused; [reason] says what to tell the user. */
+    data class Refused(val reason: SyncRefusal) : SyncMerge
+}
+
+/**
+ * Why a code was refused.
+ *
+ * A closed set rather than the library's error text: the user interface has to say something
+ * different for each one, and the text of an error is not part of the interface.
+ */
+enum class SyncRefusal {
+    /** The text is not a sync code at all (a pairing code, or something else). */
+    NotACode,
+
+    /** Nothing was waiting on the channel: no code has been read yet. */
+    NothingToRead,
+
+    /** This payload was already applied. */
+    AlreadyApplied,
+
+    /** The code claims a sender the channel does not confirm. */
+    SenderMismatch,
+
+    /** The code did not authenticate with this account's master key. */
+    AuthenticationFailed,
+
+    /** Anything else, including a failure of the channel itself. */
+    Other,
+}
+
+/** What one merge changed. */
+data class SyncOutcome(
+    val added: Int,
+    val tombstonesAdded: Int,
+    val deletionsApplied: Int,
+    val unchanged: Int,
+    val madeNoChange: Boolean,
+    val needsAdjudication: Boolean,
+    val conflicts: List<SyncConflict>,
+)
+
+/**
+ * One disagreement a human has to settle.
+ *
+ * [local] is the entry this device holds and [incoming] the one the peer sent; the side that
+ * deleted is `null`, which is what [kind] explains. No seed is here: a decision is applied
+ * inside Rust, from the copy the conflict already holds.
+ */
+data class SyncConflict(
+    val entryId: String,
+    val kind: SyncConflictKind,
+    val local: SyncSide?,
+    val incoming: SyncSide?,
+    val localIsNewer: Boolean,
+)
+
+/** The shape of a disagreement, with a fallback for shapes a newer library may report. */
+enum class SyncConflictKind {
+    /** Both devices changed the entry. */
+    EntryMismatch,
+
+    /** The other device deleted it, and this one edited it and still has it. */
+    PeerDeleted,
+
+    /** This device deleted it and the other one still has it. */
+    LocalDeleted,
+
+    /** A shape this version does not know; the two sides are shown without a verdict. */
+    Unknown,
+}
+
+/** One side of a disagreement, as far as it can be shown. */
+data class SyncSide(
+    val name: String,
+    val issuer: String,
+    val account: String,
+    val note: String,
+)
+
+/** The prefix of the text form of a sync code. */
+private const val SYNC_CODE_PREFIX = "Q2FAS1"
+
+/** Length of a device identifier in hexadecimal characters (32 bytes). */
+private const val DEVICE_ID_HEX_LENGTH = 64
+
+/**
+ * The text that carries one sync payload: `Q2FAS1:<sender>:<base64 payload>`.
+ *
+ * The sender is outside the sealed payload on purpose: the core takes "who sent this" from the
+ * channel and compares it with the sender **inside** the payload, which is authenticated. The
+ * code's own label can therefore be tampered with, and doing so only makes the merge fail.
+ */
+private fun syncCodeText(sender: String, payload: ByteArray): String =
+    "$SYNC_CODE_PREFIX:$sender:${encodeToText(payload)}"
+
+/** A sync code the user handed over: the claim and the payload. */
+private class SyncCode(val sender: String, val payload: ByteArray)
+
+/** Reads a sync code, or returns `null` when the text is not one. */
+private fun parseSyncCode(text: String): SyncCode? {
+    val parts = text.trim().split(':', limit = 3)
+    if (parts.size != 3 || parts[0] != SYNC_CODE_PREFIX) return null
+
+    val sender = parts[1]
+    if (sender.length != DEVICE_ID_HEX_LENGTH || !sender.all { it.isHexDigit() }) return null
+
+    val payload = decodeFromText(parts[2]) ?: return null
+    return SyncCode(sender.lowercase(), payload)
+}
+
+/** Whether this character is one a hexadecimal identifier may contain. */
+private fun Char.isHexDigit(): Boolean = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
+
+/**
+ * The code channel: an outbound queue and an inbound queue, with **no decisions** of its own.
+ *
+ * Every protocol rule lives in the core, so this class only moves bytes: what the session
+ * queues goes into the text the user shows, and what the user reads off the other device is
+ * queued for the session to take.
+ *
+ * Its capabilities describe the text channel honestly: text has no per-message limit, because
+ * the code underneath is always available when a code is too dense to scan, and the user can
+ * carry any amount of text by hand.
+ */
+internal class CodeChannel(val deviceId: String) : FfiTransport {
+    /** Payloads the session has queued for display. */
+    private val outgoing = ArrayDeque<ByteArray>()
+
+    /** Messages the user has handed over, with the sender each code claims. */
+    private val incoming = ArrayDeque<FfiReceivedMessage>()
+
+    /** The peer this channel has seen, which is what `peers()` reports. */
+    private var peer: String? = null
+
+    /** Takes the payload the session just queued, if any. */
+    fun takeOutgoing(): ByteArray? = outgoing.removeFirstOrNull()
+
+    /** Queues what the user read off the other device. */
+    fun accept(sender: String, payload: ByteArray) {
+        peer = sender
+        incoming.addLast(FfiReceivedMessage(sender = sender, message = payload))
+    }
+
+    override fun capabilities(): FfiTransportCapabilities =
+        FfiTransportCapabilities(
+            roster = FfiRoster.TWO_PARTY,
+            maxMessageLen = null,
+            maxQrVersion = 20u,
+            singleUse = false,
+            canCarryPayload = true,
+        )
+
+    override fun localDevice(): String = deviceId
+
+    override fun send(to: FfiRecipient, message: ByteArray) {
+        outgoing.addLast(message)
+    }
+
+    override fun receive(): FfiReceivedMessage? = incoming.removeFirstOrNull()
+
+    override fun peers(): List<String> = listOfNotNull(peer)
+}
+
+/** Converts one outcome for the user interface. */
+private fun FfiSyncOutcome.toOutcome(): SyncOutcome =
+    SyncOutcome(
+        added = added.toInt(),
+        tombstonesAdded = tombstonesAdded.toInt(),
+        deletionsApplied = deletionsApplied.toInt(),
+        unchanged = unchanged.toInt(),
+        madeNoChange = madeNoChange,
+        needsAdjudication = needsAdjudication,
+        conflicts = conflicts.map { it.toConflict() },
+    )
+
+/** Converts one conflict for the user interface. */
+private fun FfiConflict.toConflict(): SyncConflict =
+    SyncConflict(
+        entryId = entryId,
+        kind =
+            when (kind) {
+                "entry_mismatch" -> SyncConflictKind.EntryMismatch
+                "peer_deleted" -> SyncConflictKind.PeerDeleted
+                "local_deleted" -> SyncConflictKind.LocalDeleted
+                else -> SyncConflictKind.Unknown
+            },
+        local = local?.toSide(),
+        incoming = incoming?.toSide(),
+        localIsNewer = localIsNewer,
+    )
+
+/** Converts one side of a conflict. */
+private fun FfiConflictSide.toSide(): SyncSide =
+    SyncSide(
+        name = name,
+        issuer = issuer.orEmpty(),
+        account = account,
+        note = note,
+    )
+
+/**
+ * Maps a failure to the reason the user interface shows.
+ *
+ * The kinds are the stable identifiers the library documents, and the fallback is required:
+ * the core is `#[non_exhaustive]`, so a newer library reports kinds this version has never
+ * seen.
+ */
+private fun refusalOf(error: FfiException): SyncRefusal =
+    when (error) {
+        is FfiException.Core ->
+            when (error.detail.kind) {
+                "sync_already_applied" -> SyncRefusal.AlreadyApplied
+                "sync_sender_mismatch" -> SyncRefusal.SenderMismatch
+                "sync_authentication_failed" -> SyncRefusal.AuthenticationFailed
+                "sync_no_session_found" -> SyncRefusal.NothingToRead
+                else -> SyncRefusal.Other
+            }
+
+        is FfiException.Qr ->
+            when (error.kind) {
+                "sync_no_session_found" -> SyncRefusal.NothingToRead
+                else -> SyncRefusal.Other
+            }
+
+        else -> SyncRefusal.Other
+    }
 
 /**
  * The device that already holds the account, on the side that shows the code.
