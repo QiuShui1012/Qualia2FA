@@ -194,6 +194,61 @@ class AlgorithmTest {
     }
 
     /**
+     * Seven digits survive the round trip, and a count that does not exist is refused.
+     *
+     * The scheme and the core have 6, 7 and 8. A count outside that set has no representation
+     * across the boundary, and rounding it to the nearest one that does would save an entry
+     * whose codes are always wrong.
+     */
+    @Test
+    fun theDigitCountIsCarriedOrRefused() {
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()))
+        val sevenDigitLink =
+            assertNotNull(
+                Qualia.parseOtpAuth("otpauth://totp/Qualia:test?secret=JBSWY3DPEHPK3PXP&digits=7"),
+            )
+        assertEquals(7, sevenDigitLink.digits, "a seven-digit link must keep its digit count")
+
+        val id =
+            assertNotNull(
+                vault.addEntry(
+                    name = "Seven",
+                    issuer = "Qualia",
+                    account = "test",
+                    secretBase32 = "JBSWY3DPEHPK3PXP",
+                    algorithm = OtpAlgorithm.Sha1,
+                    digits = 7,
+                    periodSeconds = 30,
+                    note = "",
+                    unixTime = 59,
+                ),
+                "a seven-digit entry must be accepted",
+            )
+
+        val stored = assertNotNull(vault.entries().firstOrNull { it.id == id }, "the entry must be there")
+        assertEquals(7, stored.digits, "the digit count must survive the vault")
+        assertEquals(7, assertNotNull(vault.code(id, 59), "a seven-digit code").length)
+
+        for (unsupported in listOf(0, 5, 9, 12)) {
+            assertEquals(
+                null,
+                vault.addEntry(
+                    name = "No",
+                    issuer = "Qualia",
+                    account = "test",
+                    secretBase32 = "JBSWY3DPEHPK3PXP",
+                    algorithm = OtpAlgorithm.Sha1,
+                    digits = unsupported,
+                    periodSeconds = 30,
+                    note = "",
+                    unixTime = 59,
+                ),
+                "$unsupported digits has no representation and must be refused, not rounded",
+            )
+        }
+    }
+
+    /**
      * An independent TOTP: RFC 4226 §5.3's truncation over RFC 6238 §4.2's counter, with the
      * JDK's HMAC. [secret] is the raw key, already decoded.
      */

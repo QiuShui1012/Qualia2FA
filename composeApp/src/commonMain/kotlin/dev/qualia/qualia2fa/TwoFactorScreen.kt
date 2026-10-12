@@ -3,15 +3,18 @@ package dev.qualia.qualia2fa
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -571,32 +574,47 @@ private fun EntryDialog(
             Text(stringResource(if (initial == null) Res.string.dialog_add_entry else Res.string.dialog_edit_entry))
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            // The content scrolls and is capped in height, and every field takes the width it
+            // is given rather than a fixed one: in a narrow window a dialog is squeezed to
+            // what fits, and a field with a width of its own is then narrowed until its label
+            // is an ellipsis - which is what "the label disappeared" looks like.
+            Column(
+                modifier =
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(Space.s),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(stringResource(Res.string.field_name)) },
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = issuer,
                     onValueChange = { issuer = it },
                     label = { Text(stringResource(Res.string.field_issuer)) },
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = account,
                     onValueChange = { account = it },
                     label = { Text(stringResource(Res.string.field_account)) },
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = secret,
                     onValueChange = { secret = it },
                     label = { Text(stringResource(Res.string.field_secret)) },
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 // All three are shown at once: a user reading the algorithm off a server's
-                // setup page should find it without opening anything.
+                // setup page should find it without opening anything. They wrap rather than
+                // run off the edge when the window is narrow.
                 Text(stringResource(Res.string.field_algorithm), style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
                     OtpAlgorithm.entries.forEach { option ->
                         FilterChip(
                             selected = option == algorithm,
@@ -611,14 +629,14 @@ private fun EntryDialog(
                         onValueChange = { digits = it },
                         label = { Text(stringResource(Res.string.field_digits)) },
                         singleLine = true,
-                        modifier = Modifier.width(110.dp),
+                        modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = period,
                         onValueChange = { period = it },
                         label = { Text(stringResource(Res.string.field_period)) },
                         singleLine = true,
-                        modifier = Modifier.width(140.dp),
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 TextButton(onClick = { secret = Qualia.newSecret() }) {
@@ -627,6 +645,18 @@ private fun EntryDialog(
             }
         },
         confirmButton = {
+            // Nothing is defaulted on the way out: a digit count that is not one of the
+            // three the scheme has, or a period that is not a positive number, keeps Save
+            // disabled instead of quietly becoming something else.
+            val digitCount = digits.toIntOrNull()
+            val periodSeconds = period.toLongOrNull()
+            val acceptable =
+                secret.isNotBlank() &&
+                    digitCount != null &&
+                    digitCount in 6..8 &&
+                    periodSeconds != null &&
+                    periodSeconds > 0
+
             Button(
                 onClick = {
                     onSave(
@@ -635,11 +665,11 @@ private fun EntryDialog(
                         account,
                         secret.trim().uppercase(),
                         algorithm,
-                        digits.toIntOrNull() ?: 6,
-                        period.toLongOrNull() ?: 30L,
+                        requireNotNull(digitCount),
+                        requireNotNull(periodSeconds),
                     )
                 },
-                enabled = secret.isNotBlank(),
+                enabled = acceptable,
             ) { Text(stringResource(Res.string.action_save)) }
         },
         dismissButton = {

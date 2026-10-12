@@ -149,15 +149,16 @@ class Vault internal constructor(private val inner: FfiVault) {
         periodSeconds: Long,
         note: String,
         unixTime: Long,
-    ): String? =
-        try {
-            inner.addEntry(
-                buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note),
-                unixTime.toULong(),
-            )
+    ): String? {
+        val entry =
+            buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note)
+                ?: return null
+        return try {
+            inner.addEntry(entry, unixTime.toULong())
         } catch (_: Exception) {
             null
         }
+    }
 
     /**
      * Replaces the content of [id], keeping the identifier and the creation time, which
@@ -176,16 +177,17 @@ class Vault internal constructor(private val inner: FfiVault) {
         periodSeconds: Long,
         note: String,
         unixTime: Long,
-    ): Boolean =
-        try {
-            inner.updateEntry(
-                buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note),
-                unixTime.toULong(),
-            )
+    ): Boolean {
+        val entry =
+            buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note)
+                ?: return false
+        return try {
+            inner.updateEntry(entry, unixTime.toULong())
             true
         } catch (_: Exception) {
             false
         }
+    }
 
     /** Removes an entry. Returns false when there was nothing to remove. */
     fun removeEntry(id: String, unixTime: Long): Boolean =
@@ -243,7 +245,8 @@ class Vault internal constructor(private val inner: FfiVault) {
 }
 
 /**
- * Builds a generated entry from plain values.
+ * Builds a generated entry from plain values, or `null` when a parameter has no
+ * representation on the other side of the boundary.
  *
  * The timestamps are left at zero: the core stamps a new entry itself and preserves the
  * creation time of an existing one, so sending anything here would be ignored at best.
@@ -258,21 +261,23 @@ private fun buildEntry(
     digits: Int,
     periodSeconds: Long,
     note: String,
-): FfiVaultEntry =
-    FfiVaultEntry(
+): FfiVaultEntry? {
+    val ffiDigits = digitsOf(digits) ?: return null
+    return FfiVaultEntry(
         id = id,
         name = name,
         issuer = issuer.ifBlank { null },
         account = account,
         secretBase32 = secretBase32,
         algorithm = algorithm.toFfi(),
-        digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
+        digits = ffiDigits,
         period = periodSeconds.toULong(),
         counter = null,
         note = note,
         createdAt = 0uL,
         updatedAt = 0uL,
     )
+}
 
 private fun FfiVaultEntry.toEntry(): Entry =
     Entry(
@@ -282,11 +287,33 @@ private fun FfiVaultEntry.toEntry(): Entry =
         account = account,
         secretBase32 = secretBase32,
         algorithm = algorithm.toFacade(),
-        digits = if (digits == FfiDigits.EIGHT) 8 else 6,
+        digits = digits.toCount(),
         periodSeconds = period.toLong(),
         counter = counter?.toLong(),
         note = note,
     )
+
+/**
+ * The digit counts the scheme and the core have.
+ *
+ * A count outside this set has **no** representation, and `null` says so rather than rounding
+ * to the nearest supported one: an entry silently saved with six digits when seven were asked
+ * for produces codes that are always wrong, which is worse than an entry that was not saved.
+ */
+private fun digitsOf(count: Int): FfiDigits? =
+    when (count) {
+        6 -> FfiDigits.SIX
+        7 -> FfiDigits.SEVEN
+        8 -> FfiDigits.EIGHT
+        else -> null
+    }
+
+private fun FfiDigits.toCount(): Int =
+    when (this) {
+        FfiDigits.SIX -> 6
+        FfiDigits.SEVEN -> 7
+        FfiDigits.EIGHT -> 8
+    }
 
 /** The two enums name the same three algorithms; the mapping is the whole contract. */
 private fun OtpAlgorithm.toFfi(): FfiAlgorithm =
@@ -338,18 +365,20 @@ object Qualia {
         periodSeconds: Long = 30,
         digits: Int = 6,
         algorithm: OtpAlgorithm = OtpAlgorithm.Sha1,
-    ): String? =
-        try {
+    ): String? {
+        val ffiDigits = digitsOf(digits) ?: return null
+        return try {
             ffiTotpCode(
                 secretBase32 = secretBase32,
                 unixTime = unixTime.toULong(),
                 period = periodSeconds.toULong(),
                 algorithm = algorithm.toFfi(),
-                digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
+                digits = ffiDigits,
             )
         } catch (_: Exception) {
             null
         }
+    }
 
     /**
      * Opens the vault in [data] with the master key from [store], or returns `null` when
@@ -455,7 +484,7 @@ object Qualia {
                     account = parsed.account,
                     secretBase32 = parsed.secretBase32,
                     algorithm = parsed.algorithm.toFacade(),
-                    digits = if (parsed.digits == FfiDigits.EIGHT) 8 else 6,
+                    digits = parsed.digits.toCount(),
                     periodSeconds = parsed.period.toLong(),
                 )
             } catch (_: Exception) {
