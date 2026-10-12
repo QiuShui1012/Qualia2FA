@@ -21,14 +21,38 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.qualia.qualia2fa.resources.Res
+import dev.qualia.qualia2fa.resources.action_back
+import dev.qualia.qualia2fa.resources.action_complete_login
+import dev.qualia.qualia2fa.resources.action_copy_request
+import dev.qualia.qualia2fa.resources.action_generate_request
+import dev.qualia.qualia2fa.resources.action_join_existing_account
+import dev.qualia.qualia2fa.resources.action_read_pairing_code_from_image
+import dev.qualia.qualia2fa.resources.action_read_reply_from_image
+import dev.qualia.qualia2fa.resources.dialog_pick_image
+import dev.qualia.qualia2fa.resources.error_image_has_no_pairing_code
+import dev.qualia.qualia2fa.resources.error_image_has_no_reply
+import dev.qualia.qualia2fa.resources.error_image_unreadable
+import dev.qualia.qualia2fa.resources.error_joined_but_not_serialized
+import dev.qualia.qualia2fa.resources.field_pairing_code
+import dev.qualia.qualia2fa.resources.field_reply
+import dev.qualia.qualia2fa.resources.filter_image_files
+import dev.qualia.qualia2fa.resources.join_error_bad_code
+import dev.qualia.qualia2fa.resources.join_error_reply_rejected
+import dev.qualia.qualia2fa.resources.join_error_request_failed
+import dev.qualia.qualia2fa.resources.join_hand_back_request
+import dev.qualia.qualia2fa.resources.join_intro
+import dev.qualia.qualia2fa.resources.message_copied
+import dev.qualia.qualia2fa.resources.message_pairing_code_read
+import dev.qualia.qualia2fa.resources.message_reply_read
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The side that is joining an account, driven by text.
  *
- * Three steps, and the text that moves between them is exactly what a QR code will carry
- * once the code channel is wired to the screen: paste the host's payload, hand the request
- * back, paste the host's reply. Keeping the flow before the pixels means the two can be
- * swapped independently.
+ * Three steps, and the text that moves between them is exactly what a QR code carries:
+ * paste the host's payload, hand the request back, paste the host's reply. Keeping the flow
+ * before the pixels means the two can be swapped independently.
  */
 @Composable
 fun JoinAccountScreen(
@@ -43,49 +67,59 @@ fun JoinAccountScreen(
     var message by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
 
+    val copied = stringResource(Res.string.message_copied)
+    val unreadableImage = stringResource(Res.string.error_image_unreadable)
+    val noPairingCode = stringResource(Res.string.error_image_has_no_pairing_code)
+    val pairingCodeRead = stringResource(Res.string.message_pairing_code_read)
+    val noReply = stringResource(Res.string.error_image_has_no_reply)
+    val replyRead = stringResource(Res.string.message_reply_read)
+    val badCode = stringResource(Res.string.join_error_bad_code)
+    val requestFailed = stringResource(Res.string.join_error_request_failed)
+    val replyRejected = stringResource(Res.string.join_error_reply_rejected)
+    val notSerialized = stringResource(Res.string.error_joined_but_not_serialized)
+    val pickImageTitle = stringResource(Res.string.dialog_pick_image)
+    val imageFilesLabel = stringResource(Res.string.filter_image_files)
+
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("登录到已有账号", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "在一台已经解锁的设备上选择「配对新设备」，把那里显示的配对码贴到下面。",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text(stringResource(Res.string.action_join_existing_account), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(Res.string.join_intro), style = MaterialTheme.typography.bodyMedium)
 
         OutlinedTextField(
             value = payload,
             onValueChange = { payload = it },
-            label = { Text("配对码（来自已解锁的设备）") },
+            label = { Text(stringResource(Res.string.field_pairing_code)) },
             modifier = Modifier.fillMaxWidth(),
         )
 
         OutlinedButton(onClick = {
-            val image = pickGrayImage()
+            val image = pickGrayImage(pickImageTitle, imageFilesLabel)
             if (image == null) {
-                message = "没有读到图片（取消，或者文件无法解码）。"
+                message = unreadableImage
             } else {
                 val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
                 if (read == null) {
-                    message = "这张图片里没有可读的配对码。"
+                    message = noPairingCode
                 } else {
                     payload = read
-                    message = "已从图片读入配对码。"
+                    message = pairingCodeRead
                 }
             }
         }) {
-            Text("从图片读取配对码")
+            Text(stringResource(Res.string.action_read_pairing_code_from_image))
         }
 
         Button(
             onClick = {
                 val started = Qualia.joinPairing(payload.trim(), DEVICE_LABEL)
                 if (started == null) {
-                    message = "这不是一个可用的配对码，或者本机没有可用的平台密钥库。"
+                    message = badCode
                 } else {
                     val request = started.requestText()
                     if (request == null) {
-                        message = "无法生成请求：平台密钥库拒绝了这次操作。"
+                        message = requestFailed
                     } else {
                         joiner = started
                         requestText = request
@@ -95,11 +129,11 @@ fun JoinAccountScreen(
             },
             enabled = payload.isNotBlank() && joiner == null,
         ) {
-            Text("生成请求")
+            Text(stringResource(Res.string.action_generate_request))
         }
 
         requestText?.let { request ->
-            Text("把下面这段交回给那台设备：", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(Res.string.join_hand_back_request), style = MaterialTheme.typography.bodyMedium)
             // The other device reads this back; the text underneath is what it types or
             // pastes when scanning is not possible.
             remember(request) { Qualia.qrImage(request) }?.let { code ->
@@ -108,33 +142,33 @@ fun JoinAccountScreen(
             Text(request, style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = {
                 clipboard.setText(AnnotatedString(request))
-                message = "已复制。"
+                message = copied
             }) {
-                Text("复制请求")
+                Text(stringResource(Res.string.action_copy_request))
             }
 
             OutlinedTextField(
                 value = replyText,
                 onValueChange = { replyText = it },
-                label = { Text("应答（来自那台设备）") },
+                label = { Text(stringResource(Res.string.field_reply)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
             OutlinedButton(onClick = {
-                val image = pickGrayImage()
+                val image = pickGrayImage(pickImageTitle, imageFilesLabel)
                 if (image == null) {
-                    message = "没有读到图片（取消，或者文件无法解码）。"
+                    message = unreadableImage
                 } else {
                     val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
                     if (read == null) {
-                        message = "这张图片里没有可读的应答。"
+                        message = noReply
                     } else {
                         replyText = read
-                        message = "已从图片读入应答。"
+                        message = replyRead
                     }
                 }
             }) {
-                Text("从图片读取应答")
+                Text(stringResource(Res.string.action_read_reply_from_image))
             }
 
             Button(
@@ -142,11 +176,11 @@ fun JoinAccountScreen(
                     val current = joiner
                     val joined = current?.completeText(replyText.trim(), storage.masterKeyStore)
                     if (joined == null) {
-                        message = "应答没有通过验证：可能不是这次配对的应答，或者口令/会话对不上。"
+                        message = replyRejected
                     } else {
                         val data = joined.serialize()
                         if (data == null) {
-                            message = "加入成功，但保险库无法序列化。"
+                            message = notSerialized
                         } else {
                             storage.saveVault(data)
                             onJoined(joined)
@@ -155,11 +189,11 @@ fun JoinAccountScreen(
                 },
                 enabled = replyText.isNotBlank(),
             ) {
-                Text("完成登录")
+                Text(stringResource(Res.string.action_complete_login))
             }
         }
 
         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        OutlinedButton(onClick = onCancel) { Text("返回") }
+        OutlinedButton(onClick = onCancel) { Text(stringResource(Res.string.action_back)) }
     }
 }

@@ -80,6 +80,10 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            // The user-visible text lives in `composeResources`, so the application can be
+            // read in more than one language. English is the default locale (`values/`),
+            // Chinese is a translation (`values-zh/`).
+            implementation(compose.components.resources)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -115,6 +119,13 @@ uniffi {
         namespace = "qualia2fa_ffi"
         packageName = "dev.qualia.qualia2fa.ffi"
     }
+}
+
+compose.resources {
+    // The generated accessors are used from the user interface and from the tests, and
+    // the tests of a multiplatform module are a different compilation unit.
+    publicResClass = true
+    packageOfResClass = "dev.qualia.qualia2fa.resources"
 }
 
 compose.desktop {

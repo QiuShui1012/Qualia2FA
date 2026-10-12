@@ -16,11 +16,11 @@ import javax.swing.filechooser.FileNameExtensionFilter
  * average: a code's dark and light modules can differ in colour as much as in brightness,
  * and averaging channels makes coloured modules harder to tell apart, not easier.
  */
-actual fun pickGrayImage(): GrayPixels? {
+actual fun pickGrayImage(dialogTitle: String, imageFilesLabel: String): GrayPixels? {
     val chooser =
         JFileChooser().apply {
-            dialogTitle = "选择含有二维码的图片"
-            fileFilter = FileNameExtensionFilter("图片", "png", "jpg", "jpeg", "webp", "bmp", "gif")
+            this.dialogTitle = dialogTitle
+            fileFilter = FileNameExtensionFilter(imageFilesLabel, "png", "jpg", "jpeg", "webp", "bmp", "gif")
         }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return null
 

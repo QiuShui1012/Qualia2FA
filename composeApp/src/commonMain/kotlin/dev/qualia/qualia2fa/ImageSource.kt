@@ -12,5 +12,9 @@ class GrayPixels(val width: Int, val height: Int, val pixels: ByteArray)
  * API elsewhere): format decoders are where the historical vulnerabilities live, and the
  * Rust side only accepts pixels. Returns `null` when the user cancels or the file cannot
  * be decoded.
+ *
+ * The dialog's own text is a parameter rather than something this layer looks up: the
+ * dialog is opened from a callback, where no resource can be resolved, so the caller
+ * passes the text it resolved while it was composing.
  */
-expect fun pickGrayImage(): GrayPixels?
+expect fun pickGrayImage(dialogTitle: String, imageFilesLabel: String): GrayPixels?

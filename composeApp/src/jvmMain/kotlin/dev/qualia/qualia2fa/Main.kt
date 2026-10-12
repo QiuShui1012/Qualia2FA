@@ -12,8 +12,9 @@ import java.awt.event.WindowFocusListener
 /**
  * The desktop entry point.
  *
- * It wires the on-disk storage to the user interface, watches the window focus, and
- * nothing else: every decision lives in the shared code or in the Rust core.
+ * It wires the on-disk storage and the preferences to the user interface, watches the
+ * window focus, and nothing else: every decision lives in the shared code or in the Rust
+ * core.
  *
  * Losing focus locks the vault. The window is the only place that can know about it, so
  * it counts the events and the interface reacts.
@@ -36,6 +37,10 @@ fun main() = application {
             onDispose { window.removeWindowFocusListener(listener) }
         }
 
-        App(storage = FileVaultStorage(), blurCount = blurCount)
+        App(
+            storage = FileVaultStorage(),
+            settings = remember { FileSettingsStore(AppPaths.settingsFile) },
+            blurCount = blurCount,
+        )
     }
 }

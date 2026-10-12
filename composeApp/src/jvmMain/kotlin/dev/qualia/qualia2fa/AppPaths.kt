@@ -22,6 +22,9 @@ object AppPaths {
 
     val masterKeyFile: Path = dataDirectory.resolve("master.key")
 
+    /** The user's preferences; nothing in it is secret and it is not needed to unlock. */
+    val settingsFile: Path = dataDirectory.resolve("settings.properties")
+
     fun ensureDataDirectory() {
         Files.createDirectories(dataDirectory)
     }
