@@ -96,24 +96,38 @@ class Vault internal constructor(private val inner: FfiVault) {
     ): String? =
         try {
             inner.addEntry(
-                FfiVaultEntry(
-                    id = PLACEHOLDER_ID,
-                    name = name,
-                    issuer = issuer.ifBlank { null },
-                    account = account,
-                    secretBase32 = secretBase32,
-                    algorithm = FfiAlgorithm.SHA1,
-                    digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
-                    period = periodSeconds.toULong(),
-                    counter = null,
-                    note = note,
-                    createdAt = 0uL,
-                    updatedAt = 0uL,
-                ),
+                buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, digits, periodSeconds, note),
                 unixTime.toULong(),
             )
         } catch (_: Exception) {
             null
+        }
+
+    /**
+     * Replaces the content of [id], keeping the identifier and the creation time, which
+     * the core preserves on its own.
+     *
+     * Returns false when the entry does not exist or the new content is rejected.
+     */
+    fun updateEntry(
+        id: String,
+        name: String,
+        issuer: String,
+        account: String,
+        secretBase32: String,
+        digits: Int,
+        periodSeconds: Long,
+        note: String,
+        unixTime: Long,
+    ): Boolean =
+        try {
+            inner.updateEntry(
+                buildEntry(id, name, issuer, account, secretBase32, digits, periodSeconds, note),
+                unixTime.toULong(),
+            )
+            true
+        } catch (_: Exception) {
+            false
         }
 
     /** Removes an entry. Returns false when there was nothing to remove. */
@@ -140,6 +154,37 @@ class Vault internal constructor(private val inner: FfiVault) {
         const val PLACEHOLDER_ID = "00000000000000000000000000000000"
     }
 }
+
+/**
+ * Builds a generated entry from plain values.
+ *
+ * The timestamps are left at zero: the core stamps a new entry itself and preserves the
+ * creation time of an existing one, so sending anything here would be ignored at best.
+ */
+private fun buildEntry(
+    id: String,
+    name: String,
+    issuer: String,
+    account: String,
+    secretBase32: String,
+    digits: Int,
+    periodSeconds: Long,
+    note: String,
+): FfiVaultEntry =
+    FfiVaultEntry(
+        id = id,
+        name = name,
+        issuer = issuer.ifBlank { null },
+        account = account,
+        secretBase32 = secretBase32,
+        algorithm = FfiAlgorithm.SHA1,
+        digits = if (digits == 8) FfiDigits.EIGHT else FfiDigits.SIX,
+        period = periodSeconds.toULong(),
+        counter = null,
+        note = note,
+        createdAt = 0uL,
+        updatedAt = 0uL,
+    )
 
 private fun FfiVaultEntry.toEntry(): Entry =
     Entry(

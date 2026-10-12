@@ -58,6 +58,37 @@ class VaultTest {
     }
 
     @Test
+    fun editingKeepsTheIdentifierAndChangesTheCode() {
+        val store = MemoryStore()
+        val vault = assertNotNull(Qualia.createLocalVault(store))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, 6, 30, "", 1_700_000_000))
+        val before = vault.code(id, 59)
+
+        val other = "MZXW6YTBOI======"
+        assertTrue(
+            vault.updateEntry(id, "Renamed", "Issuer", "", other, 6, 30, "", 1_700_000_001),
+            "editing must succeed",
+        )
+
+        assertEquals(1, vault.entryCount, "editing must not add an entry")
+        val entry = assertNotNull(vault.entries().firstOrNull())
+        assertEquals(id, entry.id, "the identifier must not change")
+        assertEquals("Renamed", entry.name)
+        assertEquals(Qualia.totp(other, 59), vault.code(id, 59))
+        assertTrue(before != vault.code(id, 59), "the code must follow the new secret")
+    }
+
+    @Test
+    fun editingARejectedSecretChangesNothing() {
+        val store = MemoryStore()
+        val vault = assertNotNull(Qualia.createLocalVault(store))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, 6, 30, "", 1_700_000_000))
+
+        assertTrue(!vault.updateEntry(id, "Bad", "", "", "not base32!", 6, 30, "", 1_700_000_001))
+        assertEquals("Test", assertNotNull(vault.entries().firstOrNull()).name)
+    }
+
+    @Test
     fun anotherKeyCannotOpenTheFile() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))

@@ -174,6 +174,7 @@ private fun VaultScreen(
     var now by remember { mutableStateOf(currentTimeSeconds()) }
     var entries by remember { mutableStateOf(vault.entries()) }
     var adding by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Entry?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf<String?>(null) }
@@ -231,28 +232,51 @@ private fun VaultScreen(
                         vault.serialize()?.let(storage::saveVault)
                         entries = vault.entries()
                     },
+                    onEdit = { editing = entry },
                 )
             }
         }
     }
 
-    if (adding) {
-        AddEntryDialog(
-            onDismiss = { adding = false },
-            onAdd = { name, issuer, account, secret, digits, period ->
+    if (adding || editing != null) {
+        val beingEdited = editing
+        EntryDialog(
+            initial = beingEdited,
+            onDismiss = {
                 adding = false
-                val id = vault.addEntry(
-                    name = name,
-                    issuer = issuer,
-                    account = account,
-                    secretBase32 = secret,
-                    digits = digits,
-                    periodSeconds = period,
-                    note = "",
-                    unixTime = currentTimeSeconds(),
-                )
-                if (id == null) {
-                    message = "没有添加：种子或参数不被接受（种子必须是合法 Base32）"
+                editing = null
+            },
+            onSave = { name, issuer, account, secret, digits, period ->
+                val accepted =
+                    if (beingEdited == null) {
+                        vault.addEntry(
+                            name = name,
+                            issuer = issuer,
+                            account = account,
+                            secretBase32 = secret,
+                            digits = digits,
+                            periodSeconds = period,
+                            note = "",
+                            unixTime = currentTimeSeconds(),
+                        ) != null
+                    } else {
+                        vault.updateEntry(
+                            id = beingEdited.id,
+                            name = name,
+                            issuer = issuer,
+                            account = account,
+                            secretBase32 = secret,
+                            digits = digits,
+                            periodSeconds = period,
+                            note = beingEdited.note,
+                            unixTime = currentTimeSeconds(),
+                        )
+                    }
+
+                adding = false
+                editing = null
+                if (!accepted) {
+                    message = "没有保存：种子或参数不被接受（种子必须是合法 Base32）"
                 } else {
                     vault.serialize()?.let(storage::saveVault)
                     entries = vault.entries()
@@ -270,6 +294,7 @@ private fun EntryCard(
     now: Long,
     onCopy: (String) -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val period = entry.periodSeconds.coerceAtLeast(1)
     val remaining = period - (now % period)
@@ -304,6 +329,7 @@ private fun EntryCard(
 
             Column(horizontalAlignment = Alignment.End) {
                 TextButton(onClick = { code?.let(onCopy) }, enabled = code != null) { Text("复制") }
+                TextButton(onClick = onEdit) { Text("编辑") }
                 TextButton(onClick = onDelete) { Text("删除") }
             }
         }
@@ -311,20 +337,21 @@ private fun EntryCard(
 }
 
 @Composable
-private fun AddEntryDialog(
+private fun EntryDialog(
+    initial: Entry?,
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, String, Int, Long) -> Unit,
+    onSave: (String, String, String, String, Int, Long) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var issuer by remember { mutableStateOf("") }
-    var account by remember { mutableStateOf("") }
-    var secret by remember { mutableStateOf("") }
-    var digits by remember { mutableStateOf("6") }
-    var period by remember { mutableStateOf("30") }
+    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var issuer by remember { mutableStateOf(initial?.issuer.orEmpty()) }
+    var account by remember { mutableStateOf(initial?.account.orEmpty()) }
+    var secret by remember { mutableStateOf(initial?.secretBase32.orEmpty()) }
+    var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
+    var period by remember { mutableStateOf((initial?.periodSeconds ?: 30L).toString()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加条目") },
+        title = { Text(if (initial == null) "添加条目" else "编辑条目") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") })
@@ -358,7 +385,7 @@ private fun AddEntryDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onAdd(
+                    onSave(
                         name.ifBlank { "未命名" },
                         issuer,
                         account,
@@ -368,7 +395,7 @@ private fun AddEntryDialog(
                     )
                 },
                 enabled = secret.isNotBlank(),
-            ) { Text("添加") }
+            ) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
