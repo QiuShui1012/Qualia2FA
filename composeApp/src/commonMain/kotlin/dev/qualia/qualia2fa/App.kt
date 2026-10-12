@@ -50,10 +50,15 @@ private sealed interface Phase {
  *
  * # Locking
  *
- * Losing focus locks the vault, and so does [SESSION_TIMEOUT_SECONDS] without the phase
- * changing. Locking drops the only reference to the key material, which the Rust side wipes
- * when it is dropped, and clears the clipboard. Unlocking reads the master key out of the
- * platform key store again — there is no password to type, the store *is* the protection.
+ * Two things lock the vault: [SESSION_TIMEOUT_SECONDS] without the phase changing, and the
+ * user asking for it from the settings. Locking drops the only reference to the key material,
+ * which the Rust side wipes when it is dropped, and clears the clipboard. Unlocking reads the
+ * master key out of the platform key store again — there is no password to type, the store
+ * *is* the protection.
+ *
+ * Losing focus deliberately does **not** lock: the file dialog is a window of its own, so a
+ * lock on focus loss fires while the user is still choosing the image to read a QR code out
+ * of, which is one of the normal ways to add an entry.
  *
  * # The language wraps the screens, not the vault
  *
@@ -63,7 +68,7 @@ private sealed interface Phase {
  * they were resolved in the language that is no longer in effect.
  */
 @Composable
-fun App(storage: VaultStorage, settings: SettingsStore, blurCount: Int = 0) {
+fun App(storage: VaultStorage, settings: SettingsStore) {
     var language by remember { mutableStateOf(settings.language()) }
     var phase by remember { mutableStateOf<Phase>(Phase.Loading) }
     var vault by remember { mutableStateOf<Vault?>(null) }
@@ -122,10 +127,6 @@ fun App(storage: VaultStorage, settings: SettingsStore, blurCount: Int = 0) {
     }
 
     LaunchedEffect(Unit) { openExisting() }
-
-    LaunchedEffect(blurCount) {
-        if (blurCount > 0 && vault != null) lock(Status.LockedOnBlur)
-    }
 
     LaunchedEffect(phase) {
         if (phase !is Phase.Main) return@LaunchedEffect

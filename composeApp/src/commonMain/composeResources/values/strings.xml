@@ -39,13 +39,18 @@
 
     <!-- Lock -->
     <string name="status_locked">Locked</string>
-    <string name="status_locked_on_blur">The window lost focus, so the vault was locked</string>
-    <string name="status_locked_on_timeout">Locked after %1$d seconds without activity</string>
+    <string name="status_locked_on_timeout">Locked automatically after being open for %1$d seconds</string>
 
     <!-- The 2FA screen -->
     <string name="two_factor_empty">No entries yet. Use + to scan a QR code or to enter a secret by hand.</string>
     <string name="menu_scan_code">Scan a QR code</string>
+    <string name="menu_import_from_link">Import from a link</string>
     <string name="menu_enter_manually">Enter it by hand</string>
+    <string name="dialog_import_link">Import an otpauth:// link</string>
+    <string name="field_otpauth_link">Link</string>
+    <string name="hint_link_prefilled">The link is filled in already when the clipboard holds one.</string>
+    <string name="action_import">Import</string>
+    <string name="error_link_rejected">This is not an otpauth:// link, or its parameters are not accepted (the secret must be valid Base32).</string>
     <string name="cd_add_entry">Add an entry</string>
     <string name="cd_enter_selection">Select entries</string>
     <string name="cd_selection_all">Select all</string>

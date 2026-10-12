@@ -5,7 +5,6 @@ import androidx.compose.runtime.ProvidedValue
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.language_system
 import dev.qualia.qualia2fa.resources.status_locked
-import dev.qualia.qualia2fa.resources.status_locked_on_blur
 import dev.qualia.qualia2fa.resources.status_locked_on_timeout
 import org.jetbrains.compose.resources.stringResource
 
@@ -76,13 +75,10 @@ fun AppLanguage.label(): String =
  * stays readable instead of passing by.
  */
 sealed interface Status {
-    /** The user locked the vault. */
+    /** The user locked the vault from the settings. */
     data object Locked : Status
 
-    /** The window lost focus, which locks the vault. */
-    data object LockedOnBlur : Status
-
-    /** The vault was locked after [seconds] without activity. */
+    /** The vault was locked after [seconds] without the phase changing. */
     data class LockedAfterTimeout(val seconds: Int) : Status
 }
 
@@ -91,6 +87,5 @@ sealed interface Status {
 fun Status.text(): String =
     when (this) {
         Status.Locked -> stringResource(Res.string.status_locked)
-        Status.LockedOnBlur -> stringResource(Res.string.status_locked_on_blur)
         is Status.LockedAfterTimeout -> stringResource(Res.string.status_locked_on_timeout, seconds)
     }

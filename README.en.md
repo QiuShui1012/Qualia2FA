@@ -42,9 +42,9 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   key store, which is reported as it is — TPM or software), or log in by pairing with a
   device that is already unlocked. A device that already holds a master key is only offered
   unlocking and logging in: creating a vault there would replace that key
-- **Entries**: add, edit and delete by hand, and import one from an `otpauth://` QR code in
-  an image; selection mode deletes several at once, after asking, because the tombstone
-  reaches every device the account syncs with
+- **Entries**: add, edit and delete by hand, import one from an `otpauth://` QR code in an
+  image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
+  because the tombstone reaches every device the account syncs with
 - **Codes**: live display, countdown ring, one-click copy (the clipboard is cleared again
   after 30 seconds, and only if it still holds what was copied)
 - **Pairing**: started from the sync screen; a pairing code can be drawn as a QR code and
@@ -55,9 +55,10 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   identity actually have, recovery key import and export, and locking now
 - **Recovery keys**: export (the passphrase is typed twice) and import (replacing this
   device's vault is confirmed first, then the passphrase is asked for)
-- **Locking**: losing focus locks the vault, there is a 15-minute absolute timeout, and
-  locking releases the key material and clears the clipboard; the login screen unlocks it
-  again
+- **Locking**: the vault locks 15 minutes after it opens, and on demand from the settings;
+  locking releases the key material and clears the clipboard, and the login screen unlocks it
+  again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
+  lock before a QR code could be picked out of an image
 
 Not there yet: LAN and hotspot syncing, multiple accounts, master key rotation, Android and
 iOS.

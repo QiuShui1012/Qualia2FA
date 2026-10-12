@@ -32,13 +32,18 @@
 
     <!-- 锁定 -->
     <string name="status_locked">已锁定</string>
-    <string name="status_locked_on_blur">窗口失去焦点，已锁定</string>
-    <string name="status_locked_on_timeout">超过 %1$d 秒未解锁，已锁定</string>
+    <string name="status_locked_on_timeout">打开 %1$d 秒后自动锁定</string>
 
     <!-- 2FA 界面 -->
     <string name="two_factor_empty">还没有条目。点 + 扫描二维码，或者手动输入种子。</string>
     <string name="menu_scan_code">扫描二维码</string>
+    <string name="menu_import_from_link">从链接导入</string>
     <string name="menu_enter_manually">手动输入</string>
+    <string name="dialog_import_link">导入 otpauth:// 链接</string>
+    <string name="field_otpauth_link">链接</string>
+    <string name="hint_link_prefilled">剪贴板里有链接时会预先填好。</string>
+    <string name="action_import">导入</string>
+    <string name="error_link_rejected">这不是 otpauth:// 链接，或者它的参数不被接受（种子必须是合法 Base32）。</string>
     <string name="cd_add_entry">添加条目</string>
     <string name="cd_enter_selection">选择条目</string>
     <string name="cd_selection_all">全选</string>

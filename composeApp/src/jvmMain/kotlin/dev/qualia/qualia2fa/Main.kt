@@ -1,29 +1,28 @@
 package dev.qualia.qualia2fa
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.qualia2fa_logo
-import java.awt.event.WindowEvent
-import java.awt.event.WindowFocusListener
 import org.jetbrains.compose.resources.painterResource
 
 /**
  * The desktop entry point.
  *
- * It wires the on-disk storage and the preferences to the user interface, watches the
- * window focus, and nothing else: every decision lives in the shared code or in the Rust
- * core.
+ * It wires the on-disk storage and the preferences to the user interface, and nothing else:
+ * every decision lives in the shared code or in the Rust core.
  *
- * Losing focus locks the vault. The window is the only place that can know about it, so
- * it counts the events and the interface reacts.
+ * # Focus loss does not lock the vault
  *
- * The window icon is the same mark the interface shows, so the taskbar entry, the
- * Alt-Tab switcher and the window itself are recognizably one application.
+ * It used to. The problem is that the file dialog is a window of its own: choosing an image
+ * takes the focus away from this window, so a vault locked on focus loss locks *before* the
+ * user can pick the file. Reading a QR code out of an image is a normal way to add an entry,
+ * so the lock was fighting the feature. What is left is the inactivity timeout, which no
+ * dialog can defeat, and locking on demand from the settings.
+ *
+ * The window icon is the same mark the interface shows, so the taskbar entry, the Alt-Tab
+ * switcher and the window itself are recognizably one application.
  */
 fun main() = application {
     Window(
@@ -31,26 +30,9 @@ fun main() = application {
         title = "Qualia2FA",
         icon = painterResource(Res.drawable.qualia2fa_logo),
     ) {
-        var blurCount by remember { mutableStateOf(0) }
-
-        val window = window
-        androidx.compose.runtime.DisposableEffect(window) {
-            val listener =
-                object : WindowFocusListener {
-                    override fun windowGainedFocus(event: WindowEvent?) = Unit
-
-                    override fun windowLostFocus(event: WindowEvent?) {
-                        blurCount += 1
-                    }
-                }
-            window.addWindowFocusListener(listener)
-            onDispose { window.removeWindowFocusListener(listener) }
-        }
-
         App(
             storage = FileVaultStorage(),
             settings = remember { FileSettingsStore(AppPaths.settingsFile) },
-            blurCount = blurCount,
         )
     }
 }

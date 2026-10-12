@@ -45,6 +45,7 @@ import dev.qualia.qualia2fa.resources.action_delete_selected
 import dev.qualia.qualia2fa.resources.action_done
 import dev.qualia.qualia2fa.resources.action_edit
 import dev.qualia.qualia2fa.resources.action_generate_secret
+import dev.qualia.qualia2fa.resources.action_import
 import dev.qualia.qualia2fa.resources.action_save
 import dev.qualia.qualia2fa.resources.cd_add_entry
 import dev.qualia.qualia2fa.resources.cd_enter_selection
@@ -57,23 +58,28 @@ import dev.qualia.qualia2fa.resources.dialog_add_entry
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_text
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_title
 import dev.qualia.qualia2fa.resources.dialog_edit_entry
+import dev.qualia.qualia2fa.resources.dialog_import_link
 import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_entry_not_saved
 import dev.qualia.qualia2fa.resources.error_entry_rejected
 import dev.qualia.qualia2fa.resources.error_image_has_no_entry
 import dev.qualia.qualia2fa.resources.error_image_unreadable
+import dev.qualia.qualia2fa.resources.error_link_rejected
 import dev.qualia.qualia2fa.resources.field_account
 import dev.qualia.qualia2fa.resources.field_digits
 import dev.qualia.qualia2fa.resources.field_issuer
 import dev.qualia.qualia2fa.resources.field_name
+import dev.qualia.qualia2fa.resources.field_otpauth_link
 import dev.qualia.qualia2fa.resources.field_period
 import dev.qualia.qualia2fa.resources.field_secret
 import dev.qualia.qualia2fa.resources.filter_image_files
+import dev.qualia.qualia2fa.resources.hint_link_prefilled
 import dev.qualia.qualia2fa.resources.icon_add
 import dev.qualia.qualia2fa.resources.icon_select
 import dev.qualia.qualia2fa.resources.icon_select_all
 import dev.qualia.qualia2fa.resources.icon_selected
 import dev.qualia.qualia2fa.resources.menu_enter_manually
+import dev.qualia.qualia2fa.resources.menu_import_from_link
 import dev.qualia.qualia2fa.resources.menu_scan_code
 import dev.qualia.qualia2fa.resources.message_copied_and_cleared
 import dev.qualia.qualia2fa.resources.message_entries_deleted
@@ -111,6 +117,8 @@ fun TwoFactorScreen(
     var copied by remember { mutableStateOf<String?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
+    var importingLink by remember { mutableStateOf(false) }
+    var linkText by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<Entry?>(null) }
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
@@ -124,6 +132,7 @@ fun TwoFactorScreen(
     val entryRejected = stringResource(Res.string.error_entry_rejected)
     val entryImported = stringResource(Res.string.message_entry_imported)
     val entryNotSaved = stringResource(Res.string.error_entry_not_saved)
+    val linkRejected = stringResource(Res.string.error_link_rejected)
     val unnamed = stringResource(Res.string.default_entry_name)
     val copiedAndCleared = stringResource(Res.string.message_copied_and_cleared)
     val pickImageTitle = stringResource(Res.string.dialog_pick_image)
@@ -133,6 +142,39 @@ fun TwoFactorScreen(
     fun refresh() {
         entries = vault.entries()
         onPersist()
+    }
+
+    /**
+     * Adds the entry an `otpauth://` link describes, and says what happened.
+     *
+     * One function for both ways in — out of an image and off the clipboard — because they
+     * differ only in how the text is obtained, and two copies of the entry-building rules
+     * would be two places for them to drift apart.
+     */
+    fun addFrom(text: String) {
+        val link = Qualia.parseOtpAuth(text)
+        if (link == null) {
+            message = linkRejected
+            return
+        }
+
+        val added =
+            vault.addEntry(
+                name = link.issuer.ifBlank { link.account }.ifBlank { importedEntryName },
+                issuer = link.issuer,
+                account = link.account,
+                secretBase32 = link.secretBase32,
+                digits = link.digits,
+                periodSeconds = link.periodSeconds,
+                note = "",
+                unixTime = currentTimeSeconds(),
+            )
+        if (added == null) {
+            message = entryRejected
+        } else {
+            refresh()
+            message = entryImported
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -202,29 +244,16 @@ fun TwoFactorScreen(
                                     message = unreadableImage
                                 } else {
                                     val text = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                                    val link = text?.let { Qualia.parseOtpAuth(it) }
-                                    if (link == null) {
-                                        message = noEntryCode
-                                    } else {
-                                        val id =
-                                            vault.addEntry(
-                                                name = link.issuer.ifBlank { link.account }.ifBlank { importedEntryName },
-                                                issuer = link.issuer,
-                                                account = link.account,
-                                                secretBase32 = link.secretBase32,
-                                                digits = link.digits,
-                                                periodSeconds = link.periodSeconds,
-                                                note = "",
-                                                unixTime = currentTimeSeconds(),
-                                            )
-                                        if (id == null) {
-                                            message = entryRejected
-                                        } else {
-                                            refresh()
-                                            message = entryImported
-                                        }
-                                    }
+                                    if (text == null) message = noEntryCode else addFrom(text)
                                 }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.menu_import_from_link)) },
+                            onClick = {
+                                menuOpen = false
+                                linkText = clipboard.getText()?.text?.trim().orEmpty()
+                                importingLink = true
                             },
                         )
                         DropdownMenuItem(
@@ -297,6 +326,21 @@ fun TwoFactorScreen(
                 TextButton(onClick = { confirmingDelete = false }) {
                     Text(stringResource(Res.string.action_cancel))
                 }
+            },
+        )
+    }
+
+    if (importingLink) {
+        LinkDialog(
+            initial = linkText,
+            onDismiss = {
+                importingLink = false
+                linkText = ""
+            },
+            onImport = { text ->
+                importingLink = false
+                linkText = ""
+                addFrom(text)
             },
         )
     }
@@ -449,6 +493,48 @@ private fun EntryCard(
             }
         }
     }
+}
+
+/**
+ * The way in for a link: an `otpauth://` URI pasted from wherever the user got it.
+ *
+ * The field starts out holding the clipboard when the clipboard holds a link, because that is
+ * where a link arrives from — a web page, a chat message, another application. Nothing is
+ * taken out of the clipboard behind the user's back: the text lands in the field, and
+ * importing it is a button press.
+ */
+@Composable
+private fun LinkDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onImport: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(initial) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.dialog_import_link)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(stringResource(Res.string.field_otpauth_link)) },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Hint(stringResource(Res.string.hint_link_prefilled))
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onImport(text.trim()) }, enabled = text.isNotBlank()) {
+                Text(stringResource(Res.string.action_import))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_cancel)) }
+        },
+    )
 }
 
 /** The editor, for a new entry and for an existing one. */

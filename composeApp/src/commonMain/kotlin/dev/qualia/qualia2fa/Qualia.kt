@@ -463,6 +463,11 @@ object Qualia {
      * Read in one call so that the fingerprint and the protection behind it cannot come from
      * two different answers; `null` means there is no usable store, which is a fact the user
      * interface has to report rather than a failure.
+     *
+     * Opening the identity **creates it when it is missing**, so this is a call that changes
+     * the machine the first time it is made. In practice the identity is created when the
+     * vault is registered; a device whose vault is here but whose platform key is gone cannot
+     * open that vault in the first place, and never reaches this call.
      */
     fun deviceIdentity(label: String): DeviceIdentity? =
         try {

@@ -2,6 +2,7 @@ package dev.qualia.qualia2fa
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -36,5 +37,67 @@ class QualiaTest {
     @Test
     fun invalidSecretsFailInsteadOfThrowing() {
         assertEquals(null, Qualia.totp("not base32!", 59))
+    }
+
+    @Test
+    fun anOtpauthLinkIsParsedIntoTheFieldsAnEntryNeeds() {
+        val link =
+            assertNotNull(
+                Qualia.parseOtpAuth(
+                    "otpauth://totp/ACME%20Co:alice%40example.com" +
+                        "?secret=JBSWY3DPEHPK3PXP&issuer=ACME%20Co&digits=8&period=60",
+                ),
+                "a well-formed otpauth link must parse",
+            )
+
+        assertEquals("ACME Co", link.issuer)
+        assertEquals("alice@example.com", link.account)
+        assertEquals("JBSWY3DPEHPK3PXP", link.secretBase32)
+        assertEquals(8, link.digits)
+        assertEquals(60L, link.periodSeconds)
+    }
+
+    @Test
+    fun linksThatAreNotOtpauthAreRefused() {
+        assertEquals(null, Qualia.parseOtpAuth("https://example.com/?secret=JBSWY3DPEHPK3PXP"))
+        assertEquals(null, Qualia.parseOtpAuth("otpauth://totp/alice?secret=not%20base32"))
+        assertEquals(null, Qualia.parseOtpAuth(""))
+    }
+
+    /**
+     * The path the "+" menu's link option takes: parse a link, add what it describes, and
+     * compute a code from it.
+     *
+     * The expected code is RFC 6238's vector, so this also says the fields were carried
+     * across intact — a digit count or a period lost on the way would produce a different
+     * code rather than an error.
+     */
+    @Test
+    fun anEntryImportedFromALinkProducesTheRfcCode() {
+        val link =
+            assertNotNull(
+                Qualia.parseOtpAuth(
+                    "otpauth://totp/Qualia:test?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8&period=30",
+                ),
+            )
+
+        val store = MemoryStore()
+        val vault = assertNotNull(Qualia.createLocalVault(store), "a local vault must be creatable")
+        val id =
+            assertNotNull(
+                vault.addEntry(
+                    name = "Qualia",
+                    issuer = link.issuer,
+                    account = link.account,
+                    secretBase32 = link.secretBase32,
+                    digits = link.digits,
+                    periodSeconds = link.periodSeconds,
+                    note = "",
+                    unixTime = 59,
+                ),
+                "the entry the link describes must be accepted",
+            )
+
+        assertEquals("94287082", vault.code(id, 59))
     }
 }
