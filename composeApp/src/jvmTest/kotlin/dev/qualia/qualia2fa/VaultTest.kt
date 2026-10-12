@@ -94,14 +94,16 @@ class VaultTest {
             Qualia.joinPairing(payload, "qualia2fa-test-joiner"),
             "the payload must be accepted as a pairing code",
         )
-        val request = assertNotNull(joiner.request(), "the joiner must produce a request")
+        // Everything after the first payload travels in the text form a code channel can
+        // carry, which is the path the user interface takes.
+        val requestText = assertNotNull(joiner.requestText(), "the joiner must produce a request")
         assertNotNull(joiner.identity(), "the joiner must have an identity once it asked")
 
-        val reply = assertNotNull(hostVault.authorize(host, request), "the host must authorise the request")
+        val replyText = assertNotNull(host.replyTo(requestText, hostVault), "the host must authorise the request")
         assertNotNull(host.joinerDeviceId, "the host must be able to show who is asking")
 
         val joinerStore = MemoryStore()
-        val joined = assertNotNull(joiner.complete(reply, joinerStore), "the joiner must complete")
+        val joined = assertNotNull(joiner.completeText(replyText, joinerStore), "the joiner must complete")
         assertEquals(0, joined.entryCount, "pairing hands over the key, not the entries")
 
         val asSeenByJoiner = assertNotNull(

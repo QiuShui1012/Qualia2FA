@@ -381,6 +381,18 @@ class PairingHost internal constructor(private val inner: FfiLogin) {
         } catch (_: Exception) {
             null
         }
+
+    /**
+     * The reply to carry back to the joiner, in the text form the code channel uses.
+     *
+     * Returns `null` when the request was not accepted, which is also what happens when
+     * the request did not come from this pairing.
+     */
+    fun replyTo(requestText: String, vault: Vault): String? {
+        val request = decodeFromText(requestText) ?: return null
+        val reply = vault.authorize(this, request) ?: return null
+        return encodeToText(reply)
+    }
 }
 
 /**
@@ -401,10 +413,15 @@ class PairingJoiner internal constructor(
             null
         }
 
+    /** The request in the text form the code channel uses, or `null` if it failed. */
+    fun requestText(): String? = request()?.let(::encodeToText)
+
     /** This device's public identity, once [request] produced one. */
     fun identity(): ByteArray? = inner.identity()
 
     /**
+     * Completes the pairing from the host's reply.
+     *
      * Verifies the reply, writes the master key into [store] and returns the vault it
      * unlocks, or `null` when the reply did not verify — a wrong session, a tampered
      * message, or a host using a different master key all look the same from here.
@@ -418,6 +435,12 @@ class PairingJoiner internal constructor(
         } catch (_: Exception) {
             null
         }
+
+    /** [complete] with the reply in the text form the code channel uses. */
+    fun completeText(replyText: String, store: MasterKeyStore): Vault? {
+        val reply = decodeFromText(replyText) ?: return null
+        return complete(reply, store)
+    }
 }
 
 /**
