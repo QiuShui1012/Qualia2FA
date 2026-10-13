@@ -22,6 +22,7 @@ import dev.qualia.qualia2fa.ffi.FfiTransport
 import dev.qualia.qualia2fa.ffi.FfiTransportCapabilities
 import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
 import dev.qualia.qualia2fa.ffi.qrDecode as ffiQrDecode
+import dev.qualia.qualia2fa.ffi.qrDecodeText as ffiQrDecodeText
 import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
 import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
@@ -521,9 +522,19 @@ object Qualia {
      */
     fun qrTextFromImage(pixels: ByteArray, width: Int, height: Int): String? =
         try {
+            // A code of this application is tried first, because its text comes back unwrapped:
+            // pairing and sync codes are carried inside an envelope, and the screens that read
+            // them expect what was put in. Any other code — a server's `otpauth://` link, which
+            // is what importing an entry starts from — is not this application's, and the
+            // payload reader refuses it by design. That refusal is not a failure to read the
+            // image, so the text reader gets the second attempt.
             ffiQrDecode(pixels, width.toUInt(), height.toUInt())
         } catch (_: Exception) {
-            null
+            try {
+                ffiQrDecodeText(pixels, width.toUInt(), height.toUInt())
+            } catch (_: Exception) {
+                null
+            }
         }
 
     /**
