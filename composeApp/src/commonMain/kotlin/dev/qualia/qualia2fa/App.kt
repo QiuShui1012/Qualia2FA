@@ -270,10 +270,11 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                                 onJoined = { joined ->
                                     vault = joined
                                     message = null
-                                    // The design sends a device that just logged in to the sync
-                                    // screen, which is where its entries come from: logging in
-                                    // brings the key, not the content.
-                                    phase = Phase.Main(Tab.Sync)
+                                    // The account's entries arrive by a sync rather than by the
+                                    // login itself, but that is the user's next step, not their
+                                    // destination: the device lands where a device always lands,
+                                    // and asks for the sync from there.
+                                    phase = Phase.Main(Tab.TwoFactor)
                                 },
                                 onCancel = {
                                     vault = null
