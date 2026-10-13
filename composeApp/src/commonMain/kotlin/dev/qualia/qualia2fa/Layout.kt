@@ -12,12 +12,13 @@ import androidx.compose.ui.unit.dp
  * Written as a function of the window size, it can be reasoned about and tested without a
  * window, and the composables only have to arrange what they are told to show.
  *
- * The thresholds are **not** in the design — it says "when the width is not enough" and
- * leaves the number open — so they are chosen here, once, and named.
+ * The design's rules are of two kinds, and keeping them apart is what makes them predictable.
+ * "When the width is not enough" is **not** a threshold: it is the window having stopped being
+ * wider than it is tall — the same fact [isLandscape] names — which is why every side-by-side
+ * arrangement in the design gives way at the same moment, whatever the window's absolute size.
+ * The heights it does leave open, "when the height is not enough", said twice with a different
+ * consequence on each screen, are chosen here, once, and named.
  */
-
-/** Below this width a side-by-side arrangement no longer fits and stacks instead. */
-val CompactWidth = 520.dp
 
 /**
  * Below this height a title is dropped: a title next to a control is what stops fitting
@@ -34,8 +35,9 @@ val MinimalHeight = 240.dp
 /**
  * From this width a form puts two of its short fields on one row.
  *
- * It is the same idea as [CompactWidth] one level down: below it, a half-width field is
- * narrower than its own label needs and the label is ellipsized away, so the fields stack.
+ * This one is a width and not a shape, because what has to fit is a field and its own label
+ * side by side, not one column beside another: under it a half-width field is narrower than
+ * the label it carries, and a label that does not fit is ellipsized away.
  */
 val FormTwoColumnWidth = 420.dp
 
@@ -61,8 +63,8 @@ data class LoadingLayout(
     /**
      * Whether the ring sits beside the mark and the title rather than below them.
      *
-     * Beside is the arrangement for a wide window; a narrow one stacks, because a row of a
-     * mark, a title and a ring is the first thing to look cramped.
+     * Beside is the arrangement for a window wider than it is tall; once it is not, the row of
+     * a mark, a title and a ring is the first thing to look cramped, so it stacks.
      */
     val ringBesideBrand: Boolean,
     /** Whether the title is shown. */
@@ -79,7 +81,7 @@ data class LoadingLayout(
  */
 fun loadingLayout(width: Dp, height: Dp): LoadingLayout =
     LoadingLayout(
-        ringBesideBrand = width >= CompactWidth,
+        ringBesideBrand = isLandscape(width, height),
         showTitle = height >= ShortHeight,
         showRing = height >= MinimalHeight,
     )
@@ -103,7 +105,7 @@ data class LoginLayout(
 /** The login screen at a given window size. */
 fun loginLayout(width: Dp, height: Dp): LoginLayout =
     LoginLayout(
-        actionsBesideBrand = isLandscape(width, height) && width >= CompactWidth,
+        actionsBesideBrand = isLandscape(width, height),
         showTitle = height >= ShortHeight,
         showLogo = height >= MinimalHeight,
     )

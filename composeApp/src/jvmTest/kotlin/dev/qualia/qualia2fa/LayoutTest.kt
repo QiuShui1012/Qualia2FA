@@ -13,13 +13,21 @@ import kotlin.test.assertTrue
  * goes before a control, decoration goes before either. That order is the part worth pinning:
  * it is what keeps a small window usable instead of merely different, and it is a rule about
  * the design rather than about any one composable.
+ *
+ * The side-by-side arrangements are the exception to "as the window shrinks": the design gives
+ * way on those when the width stops being enough, which is the window's *shape* rather than
+ * its size. Both directions of that are pinned below, because size creeping back into the
+ * decision is exactly the change that would look reasonable in a diff.
  */
 class LayoutTest {
     /** A window with room for everything. */
     private val roomy = 1280.dp to 800.dp
 
-    /** A window too narrow for anything side by side. */
-    private val narrow = 400.dp to 800.dp
+    /** A window taller than it is wide. */
+    private val portrait = 400.dp to 800.dp
+
+    /** A landscape window with very little of either. */
+    private val shallow = 400.dp to 300.dp
 
     /** A window too short for a title. */
     private val short = 1280.dp to 300.dp
@@ -42,24 +50,40 @@ class LayoutTest {
 
     /** The first thing to go is the side-by-side arrangement, not any of the content. */
     @Test
-    fun aNarrowWindowStacksInsteadOfDropping() {
-        val layout = loadingLayout(narrow.first, narrow.second)
-        assertFalse(layout.ringBesideBrand, "a narrow window stacks the ring under the title")
-        assertTrue(layout.showTitle, "a narrow window still has room for the title")
+    fun aPortraitWindowStacksInsteadOfDropping() {
+        val layout = loadingLayout(portrait.first, portrait.second)
+        assertFalse(layout.ringBesideBrand, "a window taller than it is wide stacks the ring under the title")
+        assertTrue(layout.showTitle, "a portrait window still has room for the title")
         assertTrue(layout.showRing)
 
-        val login = loginLayout(narrow.first, narrow.second)
+        val login = loginLayout(portrait.first, portrait.second)
         assertFalse(login.actionsBesideBrand)
         assertTrue(login.showTitle)
         assertTrue(login.showLogo)
     }
 
-    /** Portrait stacks even when the window is large: there is no width to put a column beside. */
+    /**
+     * The shape of the window decides the side-by-side arrangements, not its size: four hundred
+     * by three hundred keeps both of them, seven hundred by twelve hundred keeps neither.
+     */
     @Test
-    fun aTallWindowStacksTheLoginActions() {
-        val login = loginLayout(700.dp, 1200.dp)
-        assertFalse(login.actionsBesideBrand, "portrait has no room for a second column")
-        assertTrue(login.showTitle)
+    fun theShapeDecidesTheSideBySideArrangementAndNotTheSize() {
+        val small = loadingLayout(shallow.first, shallow.second)
+        assertTrue(small.ringBesideBrand, "a small landscape window keeps the ring beside the mark")
+        assertFalse(small.showTitle, "its height still decides what it drops")
+        assertTrue(small.showRing)
+        assertTrue(
+            loginLayout(shallow.first, shallow.second).actionsBesideBrand,
+            "and the login screen keeps its actions beside the brand",
+        )
+
+        val large = loadingLayout(700.dp, 1200.dp)
+        assertFalse(large.ringBesideBrand, "a large portrait window stacks, however much room it has")
+        assertTrue(large.showTitle)
+        assertFalse(
+            loginLayout(700.dp, 1200.dp).actionsBesideBrand,
+            "portrait has no room for a second column",
+        )
     }
 
     /** Height drops the title first, and the loading screen keeps its mark until the end. */
@@ -100,13 +124,11 @@ class LayoutTest {
         )
     }
 
-    /** The thresholds themselves, so that a change to them is a deliberate change. */
+    /** The heights are the only numbers the design leaves open, so they are pinned here. */
     @Test
-    fun theThresholdsAreWhereTheyAreDocumented() {
-        assertTrue(CompactWidth > 0.dp)
+    fun theHeightsAreWhereTheyAreDocumented() {
+        assertTrue(MinimalHeight > 0.dp)
         assertTrue(ShortHeight > MinimalHeight, "a title goes before decoration does")
-        assertEquals(true, isLandscape(CompactWidth + 1.dp, ShortHeight))
-        assertEquals(false, isLandscape(ShortHeight, CompactWidth + 1.dp))
     }
 
     /**
