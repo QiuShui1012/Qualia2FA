@@ -62,6 +62,8 @@ import dev.qualia.qualia2fa.resources.code_changes_in
 import dev.qualia.qualia2fa.resources.default_entry_name
 import dev.qualia.qualia2fa.resources.default_imported_entry_name
 import dev.qualia.qualia2fa.resources.dialog_add_entry
+import dev.qualia.qualia2fa.resources.dialog_delete_entry_text
+import dev.qualia.qualia2fa.resources.dialog_delete_entry_title
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_text
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_title
 import dev.qualia.qualia2fa.resources.dialog_edit_entry
@@ -80,8 +82,10 @@ import dev.qualia.qualia2fa.resources.field_name
 import dev.qualia.qualia2fa.resources.field_otpauth_link
 import dev.qualia.qualia2fa.resources.field_period
 import dev.qualia.qualia2fa.resources.field_secret
+import dev.qualia.qualia2fa.resources.field_secret_replace
 import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.hint_link_prefilled
+import dev.qualia.qualia2fa.resources.hint_secret_kept
 import dev.qualia.qualia2fa.resources.icon_add
 import dev.qualia.qualia2fa.resources.icon_select
 import dev.qualia.qualia2fa.resources.icon_select_all
@@ -131,6 +135,7 @@ fun TwoFactorScreen(
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var confirmingDelete by remember { mutableStateOf(false) }
+    var deletingEntry by remember { mutableStateOf<Entry?>(null) }
     var deletedCount by remember { mutableStateOf<Int?>(null) }
     val clipboard = LocalClipboardManager.current
 
@@ -310,14 +315,38 @@ fun TwoFactorScreen(
                         copied = code
                         message = copiedAndCleared
                     },
-                    onDelete = {
-                        vault.removeEntry(entry.id, currentTimeSeconds())
-                        refresh()
-                    },
+                    onDelete = { deletingEntry = entry },
                     onEdit = { editing = entry },
                 )
             }
         }
+    }
+
+    // One entry asks for the same confirmation the selection does, and for the same reason:
+    // the deletion is not local. A tombstone travels to every device the account is on, so the
+    // entry disappears from all of them and nothing brings the codes back.
+    deletingEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { deletingEntry = null },
+            properties = DialogDefaults,
+            title = { Text(stringResource(Res.string.dialog_delete_entry_title, entry.name)) },
+            text = { Text(stringResource(Res.string.dialog_delete_entry_text)) },
+            confirmButton = {
+                Button(onClick = {
+                    vault.removeEntry(entry.id, currentTimeSeconds())
+                    deletingEntry = null
+                    refresh()
+                    deletedCount = 1
+                }) {
+                    Text(stringResource(Res.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingEntry = null }) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+            },
+        )
     }
 
     if (confirmingDelete) {
@@ -391,7 +420,9 @@ fun TwoFactorScreen(
                             name = name,
                             issuer = issuer,
                             account = account,
-                            secretBase32 = secret,
+                            // An empty field means "leave the secret as it is": the dialog is
+                            // never given the current one, so it cannot hand it back.
+                            secretBase32 = secret.ifBlank { beingEdited.secretBase32 },
                             algorithm = algorithm,
                             digits = digits,
                             periodSeconds = period,
@@ -638,7 +669,11 @@ private fun EntryDialog(
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var issuer by remember { mutableStateOf(initial?.issuer.orEmpty()) }
     var account by remember { mutableStateOf(initial?.account.orEmpty()) }
-    var secret by remember { mutableStateOf(initial?.secretBase32.orEmpty()) }
+    // Never filled in from the entry being edited, and never shown back: a secret on screen is
+    // a secret in someone's field of view, and nothing about editing the other fields needs
+    // it. Editing therefore offers to *replace* the secret — an empty field leaves the one in
+    // the vault alone.
+    var secret by remember { mutableStateOf("") }
     var algorithm by remember { mutableStateOf(initial?.algorithm ?: OtpAlgorithm.Sha1) }
     var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
     var period by remember { mutableStateOf((initial?.periodSeconds ?: 30L).toString()) }
@@ -688,8 +723,21 @@ private fun EntryDialog(
                     OutlinedTextField(
                         value = secret,
                         onValueChange = { secret = it },
-                        label = { Text(stringResource(Res.string.field_secret)) },
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (initial == null) Res.string.field_secret else Res.string.field_secret_replace,
+                                ),
+                            )
+                        },
                         singleLine = true,
+                        // The explanation goes under the field rather than into its label:
+                        // the label has to stay a name, the way the other fields' labels are.
+                        supportingText = if (initial == null) {
+                            null
+                        } else {
+                            { Text(stringResource(Res.string.hint_secret_kept)) }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
 
@@ -733,8 +781,10 @@ private fun EntryDialog(
             // disabled instead of quietly becoming something else.
             val digitCount = digits.toIntOrNull()
             val periodSeconds = period.toLongOrNull()
+            // A blank secret is a value only when there is one to keep: adding an entry needs
+            // one, editing an entry leaves the current one alone.
             val acceptable =
-                secret.isNotBlank() &&
+                (initial != null || secret.isNotBlank()) &&
                     digitCount != null &&
                     digitCount in 6..8 &&
                     periodSeconds != null &&

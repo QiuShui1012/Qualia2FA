@@ -210,4 +210,10 @@
     <string name="cd_pick_image">从图片读取二维码</string>
     <string name="error_camera_refused">没有拿到相机权限，只能从图片里读取。</string>
     <string name="error_camera_failed">相机没能启动，只能从图片里读取。</string>
+
+    <!-- Deleting one entry, and replacing a secret -->
+    <string name="dialog_delete_entry_title">删除「%1$s」？</string>
+    <string name="dialog_delete_entry_text">删除会同步到这个账号的所有设备：那边这个条目也会消失，它产生过的验证码找不回来。</string>
+    <string name="field_secret_replace">新种子</string>
+    <string name="hint_secret_kept">留空则不改动</string>
 </resources>

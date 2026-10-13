@@ -217,4 +217,10 @@
     <string name="cd_pick_image">Read the code out of an image</string>
     <string name="error_camera_refused">The camera was not allowed, so the code has to come from an image.</string>
     <string name="error_camera_failed">The camera would not start, so the code has to come from an image.</string>
+
+    <!-- Deleting one entry, and replacing a secret -->
+    <string name="dialog_delete_entry_title">Delete “%1$s”?</string>
+    <string name="dialog_delete_entry_text">The deletion reaches every device this account is on: the entry disappears there as well, and the codes it produced cannot be recovered.</string>
+    <string name="field_secret_replace">New secret</string>
+    <string name="hint_secret_kept">Leave it blank to keep the current secret</string>
 </resources>
