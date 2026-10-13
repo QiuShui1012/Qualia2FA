@@ -12,16 +12,16 @@ import kotlin.test.assertTrue
  *
  * # Why this is worth a test
  *
- * One of the shipped icons carries its stroke in a `<style>` block with a class, and the
- * filled ones use a `viewBox` outside the usual 0–24 range. Both are places where an icon can
- * fail to draw **without failing to compile**: the application would show a hole where a
- * button should be. Drawing every icon here catches that.
+ * A drawable is chosen by its file extension, parsed at runtime, and drawn against a view box
+ * that nothing at compile time checks. A truncated file, a path written outside the view box
+ * or an attribute the parser does not know are all failures that compile: the application
+ * would show a hole where a button should be. Drawing every icon here catches that.
  *
  * # The icons are drawn through `Icon`
  *
  * Their own colours are placeholders: `Icon` tints whatever it is given. What matters is the
  * shape's coverage — enough pixels to be a glyph, not so many that it is a filled square
- * (which is what a broken `viewBox` produces).
+ * (which is what a broken view box produces).
  */
 class IconTest {
     /** The icons the interface uses, by their name in the resources. */
@@ -29,6 +29,7 @@ class IconTest {
         listOf(
             "icon_2fa",
             "icon_add",
+            "icon_image",
             "icon_menu",
             "icon_select",
             "icon_select_all",
@@ -44,10 +45,10 @@ class IconTest {
     fun everyIconShipsAndDrawsAGlyph(): Unit =
         runBlocking {
             for (icon in icons) {
-                val bytes = Res.readBytes("drawable/$icon.svg")
-                assertTrue(bytes.isNotEmpty(), "$icon.svg must be part of the application's resources")
+                val bytes = Res.readBytes("drawable/$icon.xml")
+                assertTrue(bytes.isNotEmpty(), "$icon.xml must be part of the application's resources")
 
-                val raster = Svg.rasterize(bytes, size)
+                val raster = Vector.rasterize(bytes, size)
                 val drawn = (0 until raster.size).count { raster.isDrawn(it) }
                 val share = drawn.toDouble() / raster.size
 
@@ -66,7 +67,7 @@ class IconTest {
     @Test
     fun aMissingIconIsAnError(): Unit =
         runBlocking {
-            val failure = runCatching { Res.readBytes("drawable/icon_that_does_not_exist.svg") }
+            val failure = runCatching { Res.readBytes("drawable/icon_that_does_not_exist.xml") }
             assertNotNull(failure.exceptionOrNull(), "reading a missing drawable must fail")
         }
 }

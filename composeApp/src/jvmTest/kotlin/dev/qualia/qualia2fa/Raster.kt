@@ -1,37 +1,6 @@
 package dev.qualia.qualia2fa
 
 import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.Data
-import org.jetbrains.skia.ImageInfo
-import org.jetbrains.skia.svg.SVGDOM
-
-/**
- * Rasterizing a shipped SVG with the renderer the application itself uses.
- *
- * `painterResource` draws through Skia on every target this application has, so a drawable
- * that Skia cannot parse fails at runtime and not at compile time — a missing file, a
- * truncated one, or one that uses an SVG feature outside the supported set. Rendering it in a
- * test is what turns that into a failing test.
- *
- * The helper only exposes what the checks need: a raster and the pixels in it.
- */
-internal object Svg {
-    /** Rasterizes [svg] into a [size]×[size] square. */
-    fun rasterize(svg: ByteArray, size: Int): Raster {
-        val bitmap = Bitmap()
-        check(bitmap.allocPixels(ImageInfo.makeN32Premul(size, size))) {
-            "a raster surface of $size×$size must be allocatable"
-        }
-
-        val dom = SVGDOM(Data.makeFromBytes(svg))
-        dom.setContainerSize(size.toFloat(), size.toFloat())
-        dom.render(Canvas(bitmap))
-
-        val pixels = requireNotNull(bitmap.readPixels()) { "the raster must hand back its pixels" }
-        return Raster(size, size, pixels)
-    }
-}
 
 /**
  * The pixels of one rasterized drawing.
@@ -62,5 +31,13 @@ internal class Raster(val width: Int, val height: Int, val pixels: ByteArray) {
             if (check(channels(index))) matched++
         }
         return matched
+    }
+
+    companion object {
+        /** The pixels of a rendered bitmap. */
+        fun of(bitmap: Bitmap): Raster {
+            val pixels = requireNotNull(bitmap.readPixels()) { "the raster must hand back its pixels" }
+            return Raster(bitmap.width, bitmap.height, pixels)
+        }
     }
 }
