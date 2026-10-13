@@ -165,7 +165,7 @@ private fun Viewfinder() {
 }
 
 /** How much of the shorter side of the view the window takes. */
-private const val WINDOW_SHARE = 0.25f
+private const val WINDOW_SHARE = 0.3f
 
 /** How much of the picture behind the window is dimmed away. */
 private const val SCRIM_ALPHA = 0.55f
