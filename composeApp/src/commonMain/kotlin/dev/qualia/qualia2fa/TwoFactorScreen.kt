@@ -673,7 +673,13 @@ private fun EntryDialog(
     // a secret in someone's field of view, and nothing about editing the other fields needs
     // it. Editing therefore offers to *replace* the secret — an empty field leaves the one in
     // the vault alone.
-    var secret by remember { mutableStateOf("") }
+    //
+    // The field starts on a single space rather than on nothing, because Material floats an
+    // outlined field's label onto the border only while the field holds something: on an empty
+    // one the label drops inside and stops reading as the field's name, which is where the
+    // other fields' names are. A space is `isBlank`, so the rules around this field still see
+    // it as empty, and the value is trimmed before it is used.
+    var secret by remember { mutableStateOf(" ") }
     var algorithm by remember { mutableStateOf(initial?.algorithm ?: OtpAlgorithm.Sha1) }
     var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
     var period by remember { mutableStateOf((initial?.periodSeconds ?: 30L).toString()) }
