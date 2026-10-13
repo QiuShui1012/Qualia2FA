@@ -143,8 +143,7 @@ fun TwoFactorScreen(
     val linkRejected = stringResource(Res.string.error_link_rejected)
     val unnamed = stringResource(Res.string.default_entry_name)
     val copiedAndCleared = stringResource(Res.string.message_copied_and_cleared)
-    val pickImageTitle = stringResource(Res.string.dialog_pick_image)
-    val imageFilesLabel = stringResource(Res.string.filter_image_files)
+    val scanner = LocalCodeScanner.current
 
     /** Re-reads the entries after anything wrote to the vault. */
     fun refresh() {
@@ -250,13 +249,12 @@ fun TwoFactorScreen(
                             text = { Text(stringResource(Res.string.menu_scan_code)) },
                             onClick = {
                                 menuOpen = false
-                                val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-                                if (image == null) {
-                                    message = unreadableImage
-                                } else {
-                                    val text = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                                    if (text == null) message = noEntryCode else addFrom(text)
-                                }
+                                scanner.readCode(
+                                    unreadable = unreadableImage,
+                                    noCode = noEntryCode,
+                                    onText = ::addFrom,
+                                    onMessage = { message = it },
+                                )
                             },
                         )
                         DropdownMenuItem(
@@ -325,6 +323,7 @@ fun TwoFactorScreen(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
+            properties = DialogDefaults,
             title = { Text(stringResource(Res.string.dialog_delete_selected_title, selected.size)) },
             text = { Text(stringResource(Res.string.dialog_delete_selected_text)) },
             confirmButton = {
@@ -582,6 +581,7 @@ private fun LinkDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogDefaults,
         title = { Text(stringResource(Res.string.dialog_import_link)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
@@ -645,6 +645,7 @@ private fun EntryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogDefaults,
         title = {
             Text(stringResource(if (initial == null) Res.string.dialog_add_entry else Res.string.dialog_edit_entry))
         },

@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_copy
 import org.jetbrains.compose.resources.stringResource
@@ -260,6 +262,19 @@ fun MessageLine(message: String?, isError: Boolean = true) {
         color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
     )
 }
+
+/**
+ * The properties every dialog in this application is opened with.
+ *
+ * # Why a click outside does not close a dialog
+ *
+ * A dialog here is a form, and a form is not something to throw away: a click that lands
+ * outside the window is not a decision to discard what has been typed, so the ways out are
+ * Cancel and Back, which are both there and both deliberate. Compose also dismisses a dialog
+ * on a motion event it merely *observes* outside one, whether or not the user meant it, so
+ * leaving the property at its default would put the typed input at the mercy of a stray event.
+ */
+internal val DialogDefaults = DialogProperties(dismissOnClickOutside = false)
 
 /**
  * The language selector: the current choice, and a menu with every language.

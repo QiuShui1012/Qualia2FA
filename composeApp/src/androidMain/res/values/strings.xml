@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The one string the platform needs before the application is running: the name under the
+  launcher icon and in the task switcher. Everything the interface shows comes from the
+  multiplatform resources, which are read after the composition exists.
+-->
+<resources>
+    <string name="app_name" translatable="false">Qualia2FA</string>
+</resources>

@@ -100,7 +100,7 @@
     <string name="action_generate_code">生成同步码</string>
     <string name="sync_read_explainer">读入对方的同步码：贴在下面，或者打开它保存成的图片。</string>
     <string name="field_peer_code">对方的同步码</string>
-    <string name="action_read_code_from_image">从图片读取同步码</string>
+    <string name="action_scan_code">扫描同步码</string>
     <string name="action_merge">合并</string>
     <string name="sync_message_code_read">已从图片读入同步码。</string>
     <string name="sync_error_no_code_in_image">这张图片里没有可读的同步码。</string>
@@ -138,7 +138,7 @@
     <string name="pair_intro">把下面这段配对码交给新设备（只在这一步有效）。它读完之后会给你一段请求。</string>
     <string name="action_copy_pairing_code">复制配对码</string>
     <string name="field_joiner_request">新设备的请求</string>
-    <string name="action_read_request_from_image">从图片读取请求</string>
+    <string name="action_scan_request">扫描请求</string>
     <string name="error_image_has_no_request">这张图片里没有可读的请求。</string>
     <string name="message_request_read">已从图片读入请求。</string>
     <string name="pair_error_request_rejected">这段请求不被接受：它可能不是这次配对的请求。</string>
@@ -150,7 +150,7 @@
     <!-- 在新设备上登录 -->
     <string name="join_intro">在一台已经解锁的设备上选择「配对新设备」，把那里显示的配对码贴到下面。</string>
     <string name="field_pairing_code">配对码（来自已解锁的设备）</string>
-    <string name="action_read_pairing_code_from_image">从图片读取配对码</string>
+    <string name="action_scan_pairing_code">扫描配对码</string>
     <string name="error_image_has_no_pairing_code">这张图片里没有可读的配对码。</string>
     <string name="message_pairing_code_read">已从图片读入配对码。</string>
     <string name="join_error_bad_code">这不是一个可用的配对码，或者本机没有可用的平台密钥库。</string>
@@ -159,7 +159,7 @@
     <string name="join_hand_back_request">把下面这段交回给那台设备：</string>
     <string name="action_copy_request">复制请求</string>
     <string name="field_reply">应答（来自那台设备）</string>
-    <string name="action_read_reply_from_image">从图片读取应答</string>
+    <string name="action_scan_reply">扫描应答</string>
     <string name="error_image_has_no_reply">这张图片里没有可读的应答。</string>
     <string name="message_reply_read">已从图片读入应答。</string>
     <string name="join_error_reply_rejected">应答没有通过验证：可能不是这次配对的应答，或者口令/会话对不上。</string>
@@ -194,4 +194,20 @@
     <string name="dialog_import_recovery_text">导入恢复密钥会把本机的内容替换成那个账号。只存在于本机的条目不会被合并，会就此丢失。</string>
     <string name="settings_about">关于</string>
     <string name="settings_license">应用本体为 Apache-2.0；它所依赖的 Rust 各层为 LGPL-3.0-or-later。</string>
+
+    <!-- 重置：本机已经用不了的保险库的出路 -->
+    <string name="settings_reset">重置</string>
+    <string name="settings_reset_explainer">删除本机的保险库与主密钥，之后可以重新注册，也可以从另一台设备登录。没有导出、也没有同步过的条目会丢失。平台密钥库里的设备身份保留：这里修的是账号，不是身份。</string>
+    <string name="action_reset_master_key">重置主密钥…</string>
+    <string name="dialog_reset_title">重置主密钥？</string>
+    <string name="dialog_reset_text">本机的保险库文件与主密钥都会被删除。如果没有别的设备持有这个账号，也没有恢复密钥文件，其中的条目就找不回来了。</string>
+    <string name="action_reset">重置</string>
+    <string name="message_master_key_reset">主密钥与保险库已删除，本机回到初次运行的状态。</string>
+
+    <!-- The scanner -->
+    <string name="scan_title">扫描二维码</string>
+    <string name="scan_hint">把二维码放进取景框，或者从图片里读取。</string>
+    <string name="cd_pick_image">从图片读取二维码</string>
+    <string name="error_camera_refused">没有拿到相机权限，只能从图片里读取。</string>
+    <string name="error_camera_failed">相机没能启动，只能从图片里读取。</string>
 </resources>

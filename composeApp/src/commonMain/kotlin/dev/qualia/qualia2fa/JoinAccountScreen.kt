@@ -24,8 +24,8 @@ import dev.qualia.qualia2fa.resources.action_complete_login
 import dev.qualia.qualia2fa.resources.action_copy_request
 import dev.qualia.qualia2fa.resources.action_generate_request
 import dev.qualia.qualia2fa.resources.action_join_existing_account
-import dev.qualia.qualia2fa.resources.action_read_pairing_code_from_image
-import dev.qualia.qualia2fa.resources.action_read_reply_from_image
+import dev.qualia.qualia2fa.resources.action_scan_pairing_code
+import dev.qualia.qualia2fa.resources.action_scan_reply
 import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_image_has_no_pairing_code
 import dev.qualia.qualia2fa.resources.error_image_has_no_reply
@@ -78,8 +78,7 @@ fun JoinAccountScreen(
     val requestFailed = stringResource(Res.string.join_error_request_failed)
     val replyRejected = stringResource(Res.string.join_error_reply_rejected)
     val notSerialized = stringResource(Res.string.error_joined_but_not_serialized)
-    val pickImageTitle = stringResource(Res.string.dialog_pick_image)
-    val imageFilesLabel = stringResource(Res.string.filter_image_files)
+    val scanner = LocalCodeScanner.current
 
     Column(
         modifier = Modifier.fillMaxSize().padding(Space.l).verticalScroll(rememberScrollState()),
@@ -98,20 +97,17 @@ fun JoinAccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedButton(onClick = {
-                val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-                if (image == null) {
-                    message = unreadableImage
-                } else {
-                    val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                    if (read == null) {
-                        message = noPairingCode
-                    } else {
-                        payload = read
+                scanner.readCode(
+                    unreadable = unreadableImage,
+                    noCode = noPairingCode,
+                    onText = {
+                        payload = it
                         message = pairingCodeRead
-                    }
-                }
+                    },
+                    onMessage = { message = it },
+                )
             }) {
-                Text(stringResource(Res.string.action_read_pairing_code_from_image))
+                Text(stringResource(Res.string.action_scan_pairing_code))
             }
             Button(
                 onClick = {
@@ -145,20 +141,17 @@ fun JoinAccountScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedButton(onClick = {
-                    val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-                    if (image == null) {
-                        message = unreadableImage
-                    } else {
-                        val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                        if (read == null) {
-                            message = noReply
-                        } else {
-                            replyText = read
+                    scanner.readCode(
+                        unreadable = unreadableImage,
+                        noCode = noReply,
+                        onText = {
+                            replyText = it
                             message = replyRead
-                        }
-                    }
+                        },
+                        onMessage = { message = it },
+                    )
                 }) {
-                    Text(stringResource(Res.string.action_read_reply_from_image))
+                    Text(stringResource(Res.string.action_scan_reply))
                 }
                 Button(
                     onClick = {

@@ -1,12 +1,20 @@
 import gobley.gradle.GobleyHost
 import gobley.gradle.Variant
+import gobley.gradle.cargo.dsl.android
 import gobley.gradle.cargo.dsl.jvm
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.net.URI
 import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    // The Android plugin is applied before the Compose plugins: Compose Multiplatform sets
+    // up its Android resources publication while it is applied, and with the Android plugin
+    // still to come that setup runs before the Android plugin has registered itself, which
+    // ends in "Can't infer current AndroidGradlePluginVersion: Is the Android plugin
+    // applied?" from the Kotlin plugin.
+    alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinComposeCompiler)
     alias(libs.plugins.kotlinAtomicfu)
     alias(libs.plugins.composeMultiplatform)
@@ -72,9 +80,46 @@ if (materializedVersion != ffiCrateVersion) {
 
 kotlin {
     jvm()
+    // The Android target is a separate platform, not a flavour of the desktop one: it gets
+    // its own source set, its own entry point and its own platform key store. What the two
+    // share — the file-backed storage, the clock, the encodings — lives in `androidJvmMain`,
+    // which both depend on, so that "how the vault is written" exists once.
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
     jvmToolchain(21)
 
     sourceSets {
+        // The source set the JVM and Android targets have in common. It is declared here
+        // rather than by the default hierarchy, which keeps `jvmMain` and `androidMain` as
+        // siblings.
+        val androidJvmMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(compose.runtime)
+            }
+        }
+        jvmMain {
+            dependsOn(androidJvmMain)
+        }
+        androidMain {
+            dependsOn(androidJvmMain)
+            dependencies {
+                implementation(libs.androidxActivityCompose)
+                // The code scanner: a preview surface, the camera bound to the activity's
+                // life, and the analysis that hands frames to the core's decoder.
+                implementation(libs.androidxCameraCore)
+                implementation(libs.androidxCameraCamera2)
+                implementation(libs.androidxCameraLifecycle)
+                implementation(libs.androidxCameraView)
+                // UniFFI's Kotlin bindings load the Rust library through JNA. The `aar`
+                // flavour is the one that carries JNA's dispatcher for Android, and 5.17 or
+                // newer is what understands 16 KB page sizes.
+                implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
+            }
+        }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -108,8 +153,55 @@ cargo {
 
     builds.jvm {
         // Only the host's Rust target is embedded: the Windows desktop build loads the
-        // library through JNA, and the other platforms are M6 work.
+        // library through JNA, and the other desktop platforms are not shipped yet.
         embedRustLibrary = (rustTarget == GobleyHost.current.rustTarget)
+    }
+
+    builds.android {
+        // The APK carries the Rust library itself, in `jniLibs`. Nothing is downloaded or
+        // loaded from outside the package.
+        embedRustLibrary = true
+    }
+}
+
+// ── Android ─────────────────────────────────────────────────────────────────────
+//
+// The device this targets is a 64-bit ARM Android tablet; other ABIs would double the
+// Rust build time for binaries nobody runs, and are added when there is a reason.
+android {
+    namespace = "dev.qualia.qualia2fa"
+    // 35 rather than 36: the Kotlin plugin this build is pinned to (2.1.21) tops out at
+    // AGP 8.7, and AGP 8.7 tops out at compileSdk 35. The device runs a newer Android,
+    // which runs an application built against an older SDK without complaint.
+    compileSdk = 35
+
+    // r28 and newer produce libraries whose load segments are aligned for 16 KB pages,
+    // which Android 15 and later may use. `llvm-readelf -l` on the built library shows it:
+    // every LOAD segment must say `Align 0x4000`.
+    ndkVersion = "28.2.13676358"
+
+    defaultConfig {
+        applicationId = "dev.qualia.qualia2fa"
+        // `java.nio.file` for the vault and the master key, `java.util.Base64` for the text
+        // encoding of a sync code: both are API 26.
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0.0"
+
+        ndk.abiFilters += setOf("arm64-v8a")
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    packaging {
+        // The APK strips native symbols by default, which makes a crash inside the Rust
+        // library a list of addresses. Keeping them is worth the size while the platform is
+        // being brought up.
+        jniLibs.keepDebugSymbols += "**/*.so"
     }
 }
 

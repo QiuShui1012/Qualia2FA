@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The camera is what reads a code off another screen. It is asked for when the scanner is
+      opened and refused without consequence: the scanner also reads a code out of an image
+      the user picks, so a device with no camera, and a user who declines, both keep a way in.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      Not required: the application works on a device without a camera, which is what the
+      manifest asks the store to accept it on.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Qualia2FA">
+
+        <!--
+          The activity handles its own configuration changes: the interface is built for a
+          window that changes shape, and being recreated on a rotation would throw away the
+          vault's in-memory state while the user is reading a code out of it.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Qualia2FA">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

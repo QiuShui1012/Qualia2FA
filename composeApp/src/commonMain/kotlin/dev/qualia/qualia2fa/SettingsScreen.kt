@@ -29,10 +29,14 @@ import dev.qualia.qualia2fa.resources.action_cancel
 import dev.qualia.qualia2fa.resources.action_continue
 import dev.qualia.qualia2fa.resources.action_export_recovery
 import dev.qualia.qualia2fa.resources.action_import_recovery
+import dev.qualia.qualia2fa.resources.action_reset
+import dev.qualia.qualia2fa.resources.action_reset_master_key
 import dev.qualia.qualia2fa.resources.app_name
 import dev.qualia.qualia2fa.resources.dialog_import_recovery_text
 import dev.qualia.qualia2fa.resources.dialog_import_recovery_title
 import dev.qualia.qualia2fa.resources.dialog_open_recovery
+import dev.qualia.qualia2fa.resources.dialog_reset_text
+import dev.qualia.qualia2fa.resources.dialog_reset_title
 import dev.qualia.qualia2fa.resources.dialog_save_recovery
 import dev.qualia.qualia2fa.resources.error_passphrase_mismatch
 import dev.qualia.qualia2fa.resources.error_recovery_export
@@ -58,6 +62,8 @@ import dev.qualia.qualia2fa.resources.settings_master_key_hardware
 import dev.qualia.qualia2fa.resources.settings_no_device_identity
 import dev.qualia.qualia2fa.resources.settings_recovery
 import dev.qualia.qualia2fa.resources.settings_recovery_explainer
+import dev.qualia.qualia2fa.resources.settings_reset
+import dev.qualia.qualia2fa.resources.settings_reset_explainer
 import dev.qualia.qualia2fa.resources.settings_software_backed
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -103,11 +109,14 @@ fun SettingsScreen(
     onSelectLanguage: (AppLanguage) -> Unit,
     onLock: () -> Unit,
     onImported: (Vault) -> Unit,
+    onReset: () -> Unit,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     var savedTo by remember { mutableStateOf<String?>(null) }
     var exporting by remember { mutableStateOf(false) }
+    var resetting by remember { mutableStateOf(false) }
     var importStep by remember { mutableStateOf<ImportStep?>(null) }
+    val picker = rememberFilePicker()
 
     val saveTitle = stringResource(Res.string.dialog_save_recovery)
     val openTitle = stringResource(Res.string.dialog_open_recovery)
@@ -171,12 +180,13 @@ fun SettingsScreen(
             }
             OutlinedButton(
                 onClick = {
-                    val file = pickBytes(openTitle, filterLabel, RECOVERY_FILE_EXTENSION)
-                    if (file == null) {
-                        message = openFailed
-                    } else {
-                        message = null
-                        importStep = ImportStep.Confirm(file)
+                    picker.pickBytes(openTitle, filterLabel, RECOVERY_FILE_EXTENSION) { file ->
+                        if (file == null) {
+                            message = openFailed
+                        } else {
+                            message = null
+                            importStep = ImportStep.Confirm(file)
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -191,6 +201,16 @@ fun SettingsScreen(
         SectionCard {
             Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.settings_lock_now))
+            }
+        }
+
+        SectionCard(title = stringResource(Res.string.settings_reset)) {
+            Hint(stringResource(Res.string.settings_reset_explainer))
+            OutlinedButton(
+                onClick = { resetting = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(Res.string.action_reset_master_key))
             }
         }
 
@@ -224,13 +244,38 @@ fun SettingsScreen(
                 if (file == null) {
                     message = exportFailed
                 } else {
-                    val path = saveBytes(RECOVERY_FILE_NAME, saveTitle, filterLabel, RECOVERY_FILE_EXTENSION, file)
-                    if (path == null) {
-                        message = saveFailed
-                    } else {
-                        message = null
-                        savedTo = path
+                    picker.saveBytes(RECOVERY_FILE_NAME, saveTitle, filterLabel, RECOVERY_FILE_EXTENSION, file) { path ->
+                        if (path == null) {
+                            message = saveFailed
+                        } else {
+                            message = null
+                            savedTo = path
+                        }
                     }
+                }
+            },
+        )
+    }
+
+    if (resetting) {
+        AlertDialog(
+            onDismissRequest = { resetting = false },
+            properties = DialogDefaults,
+            title = { Text(stringResource(Res.string.dialog_reset_title)) },
+            text = { Text(stringResource(Res.string.dialog_reset_text)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        resetting = false
+                        onReset()
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_reset))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { resetting = false }) {
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -242,6 +287,7 @@ fun SettingsScreen(
         is ImportStep.Confirm ->
             AlertDialog(
                 onDismissRequest = { importStep = null },
+                properties = DialogDefaults,
                 title = { Text(stringResource(Res.string.dialog_import_recovery_title)) },
                 text = { Text(stringResource(Res.string.dialog_import_recovery_text)) },
                 confirmButton = {
@@ -298,6 +344,7 @@ private fun PassphraseDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogDefaults,
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {

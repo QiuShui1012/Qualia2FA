@@ -1,12 +1,35 @@
 # Versions are pinned deliberately: Gobley 0.3.7 is the newest release (2025-10-08)
 # and it generates bindings against UniFFI 0.29.4, so the Kotlin toolchain stays on
 # the versions Gobley was built and tested with (Kotlin 2.1.21 / Gradle 8.14.x).
+#
+# The Android Gradle plugin is pinned to the line Kotlin 2.1.21 was tested against (its
+# compatibility table ends at 8.7.x). A newer plugin is not merely untested: KGP 2.1.21's
+# own `AndroidGradlePluginVersion.getCurrent()` cannot read the version of an 8.13 plugin
+# and fails while the Android plugin is being applied. Moving past 8.7 means moving
+# Kotlin, which Gobley 0.3.7 pins. AGP 8.7 supports compileSdk 35, which the module
+# declares.
 [versions]
 kotlin = "2.1.21"
 compose = "1.8.2"
 gobley = "0.3.7"
+androidGradlePlugin = "8.7.3"
+androidxActivity = "1.9.3"
+# UniFFI's Kotlin bindings go through JNA, and Android needs the `aar` flavour of it —
+# the jar flavour carries no dispatcher for that platform. 5.17 or newer is required for
+# 16 KB page sizes, which Android 15 and later may use.
+jna = "5.18.1"
+# CameraX: the preview and the frame analysis the code scanner is built on. `camera-view`
+# brings the preview surface, `camera-lifecycle` binds the camera to the activity's life,
+# and `camera-camera2` is the implementation the platform actually runs.
+androidxCamera = "1.4.2"
 
 [libraries]
+androidxActivityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivity" }
+androidxCameraCamera2 = { module = "androidx.camera:camera-camera2", version.ref = "androidxCamera" }
+androidxCameraCore = { module = "androidx.camera:camera-core", version.ref = "androidxCamera" }
+androidxCameraLifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "androidxCamera" }
+androidxCameraView = { module = "androidx.camera:camera-view", version.ref = "androidxCamera" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -15,3 +38,4 @@ kotlinAtomicfu = { id = "org.jetbrains.kotlin.plugin.atomicfu", version.ref = "k
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
 gobleyCargo = { id = "dev.gobley.cargo", version.ref = "gobley" }
 gobleyUniffi = { id = "dev.gobley.uniffi", version.ref = "gobley" }
+androidApplication = { id = "com.android.application", version.ref = "androidGradlePlugin" }

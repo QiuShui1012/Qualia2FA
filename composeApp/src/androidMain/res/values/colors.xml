@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The two colours the mark is drawn in, as the platform needs them before the application is
+  running: the window behind the composition, the system bars over it, and the layer of the
+  launcher icon that the mark's line work sits on.
+-->
+<resources>
+    <color name="plate">#FFEAF2F4</color>
+    <color name="ink">#FF091012</color>
+    <color name="ic_launcher_background">@color/plate</color>
+</resources>

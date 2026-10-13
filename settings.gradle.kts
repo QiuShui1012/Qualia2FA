@@ -2,6 +2,8 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
+        // The Android Gradle plugin is published to Google's Maven repository only.
+        google()
     }
 }
 

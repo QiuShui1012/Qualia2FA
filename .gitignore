@@ -3,9 +3,15 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# The SDK path is machine-specific, so it is not committed.
+local.properties
+
 # The Rust source is materialized from the published crate at build time.
 composeApp/rust/
 composeApp/target/
+
+# Bytecode the icon converter leaves behind when it is imported rather than run.
+__pycache__/
 
 # IDE
 .idea/

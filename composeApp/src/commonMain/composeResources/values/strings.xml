@@ -107,7 +107,7 @@
     <string name="action_generate_code">Generate the code</string>
     <string name="sync_read_explainer">Read the other device's code: paste it below, or open the image it was saved as.</string>
     <string name="field_peer_code">The other device's sync code</string>
-    <string name="action_read_code_from_image">Read the code from an image</string>
+    <string name="action_scan_code">Scan the code</string>
     <string name="action_merge">Merge it</string>
     <string name="sync_message_code_read">The sync code was read from the image.</string>
     <string name="sync_error_no_code_in_image">This image holds no readable sync code.</string>
@@ -145,7 +145,7 @@
     <string name="pair_intro">Hand the pairing code below to the new device (it is valid for this step only). Once it has read the code, it gives you a request.</string>
     <string name="action_copy_pairing_code">Copy the pairing code</string>
     <string name="field_joiner_request">The request from the new device</string>
-    <string name="action_read_request_from_image">Read the request from an image</string>
+    <string name="action_scan_request">Scan the request</string>
     <string name="error_image_has_no_request">This image holds no readable request.</string>
     <string name="message_request_read">The request was read from the image.</string>
     <string name="pair_error_request_rejected">This request is not accepted: it may not belong to this pairing.</string>
@@ -157,7 +157,7 @@
     <!-- Logging in on a new device -->
     <string name="join_intro">On a device that is already unlocked, choose “Pair a new device”, then paste the pairing code it shows below.</string>
     <string name="field_pairing_code">Pairing code (from the unlocked device)</string>
-    <string name="action_read_pairing_code_from_image">Read the pairing code from an image</string>
+    <string name="action_scan_pairing_code">Scan the pairing code</string>
     <string name="error_image_has_no_pairing_code">This image holds no readable pairing code.</string>
     <string name="message_pairing_code_read">The pairing code was read from the image.</string>
     <string name="join_error_bad_code">This is not a usable pairing code, or this machine has no usable platform key store.</string>
@@ -166,7 +166,7 @@
     <string name="join_hand_back_request">Hand the text below back to that device:</string>
     <string name="action_copy_request">Copy the request</string>
     <string name="field_reply">Reply (from that device)</string>
-    <string name="action_read_reply_from_image">Read the reply from an image</string>
+    <string name="action_scan_reply">Scan the reply</string>
     <string name="error_image_has_no_reply">This image holds no readable reply.</string>
     <string name="message_reply_read">The reply was read from the image.</string>
     <string name="join_error_reply_rejected">The reply did not verify: it may not belong to this pairing, or the passphrase or the session does not match.</string>
@@ -201,4 +201,20 @@
     <string name="dialog_import_recovery_text">Importing an account's recovery key replaces what is on this device with that account. Entries that exist only here are not merged, and are lost.</string>
     <string name="settings_about">About</string>
     <string name="settings_license">The application is Apache-2.0; the Rust layers it builds on are LGPL-3.0-or-later.</string>
+
+    <!-- Reset: the way out of a vault this device can no longer use -->
+    <string name="settings_reset">Reset</string>
+    <string name="settings_reset_explainer">Deletes this device's vault and master key, so that it can register again or log in from another device. Entries that were not exported or synced are lost. The device identity in the platform key store is kept: this repairs the account, not the identity.</string>
+    <string name="action_reset_master_key">Reset the master key…</string>
+    <string name="dialog_reset_title">Reset the master key?</string>
+    <string name="dialog_reset_text">The vault file and the master key on this device are deleted. If no other device holds this account and no recovery key file exists, its entries are gone for good.</string>
+    <string name="action_reset">Reset</string>
+    <string name="message_master_key_reset">The master key and the vault were removed. This device is back to its first run.</string>
+
+    <!-- The scanner -->
+    <string name="scan_title">Scan a QR code</string>
+    <string name="scan_hint">Hold the code in the frame, or read one out of an image.</string>
+    <string name="cd_pick_image">Read the code out of an image</string>
+    <string name="error_camera_refused">The camera was not allowed, so the code has to come from an image.</string>
+    <string name="error_camera_failed">The camera would not start, so the code has to come from an image.</string>
 </resources>

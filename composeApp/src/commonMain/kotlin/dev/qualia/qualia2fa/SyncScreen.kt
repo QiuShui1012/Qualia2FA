@@ -25,7 +25,7 @@ import dev.qualia.qualia2fa.resources.action_keep_entry
 import dev.qualia.qualia2fa.resources.action_keep_local
 import dev.qualia.qualia2fa.resources.action_merge
 import dev.qualia.qualia2fa.resources.action_pair_new_device
-import dev.qualia.qualia2fa.resources.action_read_code_from_image
+import dev.qualia.qualia2fa.resources.action_scan_code
 import dev.qualia.qualia2fa.resources.action_restore_entry
 import dev.qualia.qualia2fa.resources.action_take_incoming
 import dev.qualia.qualia2fa.resources.dialog_pick_image
@@ -107,8 +107,7 @@ fun SyncScreen(
     val codeRead = stringResource(Res.string.sync_message_code_read)
     val notSaved = stringResource(Res.string.sync_error_not_saved)
     val decisionRefused = stringResource(Res.string.sync_error_decision_refused)
-    val pickImageTitle = stringResource(Res.string.dialog_pick_image)
-    val imageFilesLabel = stringResource(Res.string.filter_image_files)
+    val scanner = LocalCodeScanner.current
 
     // Resolved here rather than where a refusal happens: a merge runs in a callback, and no
     // resource can be resolved there.
@@ -179,20 +178,17 @@ fun SyncScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedButton(onClick = {
-                val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-                if (image == null) {
-                    message = unreadableImage
-                } else {
-                    val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                    if (read == null) {
-                        message = noCodeInImage
-                    } else {
-                        peerCode = read
+                scanner.readCode(
+                    unreadable = unreadableImage,
+                    noCode = noCodeInImage,
+                    onText = {
+                        peerCode = it
                         message = codeRead
-                    }
-                }
+                    },
+                    onMessage = { message = it },
+                )
             }) {
-                Text(stringResource(Res.string.action_read_code_from_image))
+                Text(stringResource(Res.string.action_scan_code))
             }
             Button(onClick = { merge(peerCode.trim()) }, enabled = peerCode.isNotBlank()) {
                 Text(stringResource(Res.string.action_merge))

@@ -23,7 +23,7 @@ import dev.qualia.qualia2fa.resources.action_authorize_device
 import dev.qualia.qualia2fa.resources.action_copy_pairing_code
 import dev.qualia.qualia2fa.resources.action_done
 import dev.qualia.qualia2fa.resources.action_pair_new_device
-import dev.qualia.qualia2fa.resources.action_read_request_from_image
+import dev.qualia.qualia2fa.resources.action_scan_request
 import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_image_has_no_request
 import dev.qualia.qualia2fa.resources.error_image_unreadable
@@ -61,8 +61,7 @@ fun PairNewDeviceScreen(
     val noRequest = stringResource(Res.string.error_image_has_no_request)
     val requestRead = stringResource(Res.string.message_request_read)
     val requestRejected = stringResource(Res.string.pair_error_request_rejected)
-    val pickImageTitle = stringResource(Res.string.dialog_pick_image)
-    val imageFilesLabel = stringResource(Res.string.filter_image_files)
+    val scanner = LocalCodeScanner.current
 
     if (host == null) {
         Column(
@@ -97,20 +96,17 @@ fun PairNewDeviceScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedButton(onClick = {
-                val image = pickGrayImage(pickImageTitle, imageFilesLabel)
-                if (image == null) {
-                    message = unreadableImage
-                } else {
-                    val read = Qualia.qrTextFromImage(image.pixels, image.width, image.height)
-                    if (read == null) {
-                        message = noRequest
-                    } else {
-                        requestText = read
+                scanner.readCode(
+                    unreadable = unreadableImage,
+                    noCode = noRequest,
+                    onText = {
+                        requestText = it
                         message = requestRead
-                    }
-                }
+                    },
+                    onMessage = { message = it },
+                )
             }) {
-                Text(stringResource(Res.string.action_read_request_from_image))
+                Text(stringResource(Res.string.action_scan_request))
             }
             Button(
                 onClick = {

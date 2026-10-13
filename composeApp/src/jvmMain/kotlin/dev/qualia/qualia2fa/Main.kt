@@ -31,7 +31,7 @@ fun main() = application {
         icon = painterResource(Res.drawable.qualia2fa_logo),
     ) {
         App(
-            storage = FileVaultStorage(),
+            storage = FileVaultStorage(AppPaths.dataDirectory),
             settings = remember { FileSettingsStore(AppPaths.settingsFile) },
         )
     }
