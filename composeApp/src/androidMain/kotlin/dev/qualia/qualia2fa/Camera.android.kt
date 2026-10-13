@@ -151,10 +151,13 @@ private const val TAG = "Qualia2FA"
 /**
  * The size analysis frames are requested at, in pixels.
  *
- * Larger than the default, because a code on another screen is a small part of the picture:
- * the decoder needs enough pixels across it, and 720p still decodes in a few milliseconds.
+ * A code on another screen occupies a small part of the picture, and a dense one — a server's
+ * setup page can draw eighty modules across — needs pixels *per module*, not per frame: at
+ * 720p such a code arrives with about five pixels across a module, which is at the edge of
+ * what the decoder resolves. 1080p doubles that, and decoding two megapixels still costs
+ * milliseconds, so the analysis keeps up with [ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST].
  */
-private val ANALYSIS_EDGE = Size(1280, 720)
+private val ANALYSIS_EDGE = Size(1920, 1080)
 
 private fun analysisResolution(): ResolutionSelector =
     ResolutionSelector.Builder()
