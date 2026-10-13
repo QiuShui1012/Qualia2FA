@@ -189,6 +189,12 @@ private val FRAME_WIDTH = 3.dp
 fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) {
     var status by remember { mutableStateOf(CameraStatus.Starting) }
 
+    // The image path reports a failure through the same channel the caller uses for messages
+    // of its own, and the caller's message lands on the screen **under** this one: invisible
+    // for exactly as long as the scanner is open, which is when the user is looking for it.
+    // The message is therefore kept here as well and shown beside the hint.
+    var notice by remember { mutableStateOf<String?>(null) }
+
     val dialogTitle = stringResource(Res.string.dialog_pick_image)
     val imageFilesLabel = stringResource(Res.string.filter_image_files)
     val pickLabel = stringResource(Res.string.cd_pick_image)
@@ -246,7 +252,10 @@ fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) 
                             unreadable = request.unreadable,
                             noCode = request.noCode,
                             onText = answer,
-                            onMessage = request.onMessage,
+                            onMessage = { text ->
+                                notice = text
+                                request.onMessage(text)
+                            },
                         )
                     }
                 }
@@ -255,7 +264,14 @@ fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) 
             when (status) {
                 CameraStatus.Refused -> MessageLine(stringResource(Res.string.error_camera_refused))
                 CameraStatus.Failed -> MessageLine(stringResource(Res.string.error_camera_failed))
-                CameraStatus.Starting, CameraStatus.Running -> Hint(stringResource(Res.string.scan_hint))
+                CameraStatus.Starting, CameraStatus.Running -> {
+                    val current = notice
+                    if (current != null) {
+                        MessageLine(current)
+                    } else {
+                        Hint(stringResource(Res.string.scan_hint))
+                    }
+                }
             }
         }
     }
