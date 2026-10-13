@@ -44,10 +44,23 @@ import java.nio.file.Path
  * The activity handles orientation and screen size itself rather than being recreated. The
  * interface is built for a window that changes shape, and recreating the activity would take
  * the vault's in-memory state with it while the user is reading a code.
+ *
+ * # Why the Rust library is loaded here
+ *
+ * The device identity is a key in the platform keystore, and the platform keystore is reached
+ * from Rust over JNI — so that code needs a `JavaVM`, and it takes one in `JNI_OnLoad`, which
+ * the runtime calls when the **JVM** loads the library.
+ *
+ * JNA, which the generated bindings use to reach everything else, does not load it that way:
+ * it opens the file itself, and a library opened that way never sees `JNI_OnLoad`. Without
+ * this line the device identity reports that it was loaded without a Java VM, which is true,
+ * and the vault can neither pair nor sync.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        System.loadLibrary("qualia2fa_ffi")
 
         val dataDirectory: Path = filesDir.toPath()
         setContent {
