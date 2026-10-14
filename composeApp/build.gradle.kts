@@ -284,7 +284,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qualia2FA"
-            packageVersion = "1.0.0"
+            packageVersion = "0.0.1"
             description = "Serverless, non-realtime two-factor authentication"
             vendor = "Qualia2FA"
 
