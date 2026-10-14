@@ -74,13 +74,27 @@ private const val RECOVERY_FILE_NAME = "qualia2fa-recovery.q2fa"
 /** The extension of a recovery key file. */
 private const val RECOVERY_FILE_EXTENSION = "q2fa"
 
-/** Where an import is in its two steps. */
+/**
+ * Where an import is in its two steps.
+ *
+ * Both steps carry the chosen file, and both compare it by content: the `equals` a data class
+ * generates compares an array member by reference, which would make two steps holding the same
+ * file two different values.
+ */
 private sealed interface ImportStep {
     /** The file is chosen; the user is asked whether to replace this device's vault. */
-    data class Confirm(val file: ByteArray) : ImportStep
+    data class Confirm(val file: ByteArray) : ImportStep {
+        override fun equals(other: Any?): Boolean = other is Confirm && file.contentEquals(other.file)
+
+        override fun hashCode(): Int = file.contentHashCode()
+    }
 
     /** Confirmed; the passphrase is being asked for. */
-    data class Passphrase(val file: ByteArray) : ImportStep
+    data class Passphrase(val file: ByteArray) : ImportStep {
+        override fun equals(other: Any?): Boolean = other is Passphrase && file.contentEquals(other.file)
+
+        override fun hashCode(): Int = file.contentHashCode()
+    }
 }
 
 /**
