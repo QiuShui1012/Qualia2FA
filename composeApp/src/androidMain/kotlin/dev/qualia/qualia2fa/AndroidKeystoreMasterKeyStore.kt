@@ -138,6 +138,7 @@ class AndroidKeystoreMasterKeyStore(
     }
 
     /** Whether this device advertises a StrongBox, which is where the key would rather live. */
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun hasStrongBox(): Boolean =
         try {
             applicationContext.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
@@ -168,12 +169,25 @@ class AndroidKeystoreMasterKeyStore(
                 }
             }
 
-    /** Whether the keystore says a key is protected by hardware, taken from the key itself. */
+    /**
+     * Whether the keystore says a key is protected by hardware, taken from the key itself.
+     *
+     * Android 12 and higher describe the protection as a level rather than a flag, and only the
+     * two hardware levels count: a level the keystore does not name is reported as software,
+     * because the user is being asked to trust this answer.
+     */
     private fun hardwareBacked(key: SecretKey?): Boolean {
         key ?: return false
         return try {
             val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEY_STORE)
-            (factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo).isInsideSecureHardware
+            val info = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                info.securityLevel == KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT ||
+                    info.securityLevel == KeyProperties.SECURITY_LEVEL_STRONGBOX
+            } else {
+                @Suppress("DEPRECATION")
+                info.isInsideSecureHardware
+            }
         } catch (_: Exception) {
             false
         }
@@ -195,16 +209,13 @@ class AndroidKeystoreMasterKeyStore(
         /** Length of the authentication tag, in bits, which the tag itself is known by. */
         const val TAG_BITS = 128
 
-        /** Length of the initialisation vector, in bytes. */
+        /** Length of the initialization vector, in bytes. */
         const val IV_BYTES = 12
 
-        /** Length of an authentication tag, in bytes. */
-        const val TAG_BYTES = 16
-
-        /** The byte a wrapped key starts with: `1`, then the initialisation vector. */
+        /** The byte a wrapped key starts with: `1`, then the initialization vector. */
         const val FORMAT_VERSION: Byte = 1
 
-        /** Version byte plus the initialisation vector, before the sealed key itself. */
+        /** Version byte plus the initialization vector, before the sealed key itself. */
         const val HEADER_BYTES = 1 + IV_BYTES
     }
 }
