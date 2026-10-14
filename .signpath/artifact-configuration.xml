@@ -5,7 +5,8 @@
   It describes the structure of what is submitted for signing, not how it is signed: the
   certificate, the signing policy and the approval rules live in the SignPath project. This
   file is versioned here so that a change to the artifacts and a change to what is signed
-  are reviewed together, and is uploaded to the SignPath project when it changes.
+  are reviewed together, and is uploaded to the SignPath project when it changes -- the copy
+  in this repository is for review, and the uploaded one is what takes effect.
 
   Schema: http://signpath.io/artifact-configuration/v1
 
@@ -14,9 +15,19 @@
   The release job produces two installers for one tag, and a SignPath signing request
   carries one artifact. A `<zip-file>` root is the documented way to sign several files in
   one request: the job zips `Qualia2FA-v<version>.msi` and `Qualia2FA-v<version>.exe` into
-  `bundle.zip` and submits that. The `version` parameter is passed with the request, so the
-  paths below are checked against the version the tag carries instead of a wildcard that
-  would accept any version.
+  `bundle.zip` and submits that.
+
+  # Why a wildcard instead of a parameter
+
+  A `${version}` parameter would be the tighter description, and it is not available here:
+  user-defined parameters are refused for this project. The version is therefore a
+  wildcard, and what keeps the request honest moves to the job, which builds the zip from
+  the artifacts of the tag it is releasing and checks their names against that tag before
+  submitting.
+
+  A wildcard's default `max-matches` is 1, so a zip holding two MSIs or two EXEs is rejected
+  rather than signed twice: the wildcard leaves the version open, not the count. Paths are
+  case-insensitive, and `*` does not cross a directory separator.
 
   # What is signed
 
@@ -36,32 +47,25 @@
   than it claims is worse than one that signs less and says so. Add the paths here once a
   sample has been uploaded, and the launcher inside the installer gets a signature too.
 
+  The PE metadata carries no version fields for the same reason it carries no parameter:
+  `product-version` and `file-version` cannot be templated without one, and a literal would
+  mean editing this file for every release, which is how a version silently goes stale. The
+  product name, the company and the copyright are constants and are set here, because
+  jpackage writes no product name into the installer's own version resource at all.
+
   Signing the Rust library or the bundled runtime image is deliberately not planned: the
   runtime comes from the JDK, and putting this project's signature on a third-party binary
   would claim it as this project's own.
 -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
-  <parameters>
-    <!-- The application version without the tag's `v`, e.g. `0.0.2`. -->
-    <parameter name="version" required="true" />
-  </parameters>
-
   <zip-file>
-    <msi-file path="Qualia2FA-v${version}.msi">
+    <msi-file path="Qualia2FA-v*.msi">
       <authenticode-sign />
     </msi-file>
 
-    <!--
-      The PE metadata below is what the signature states about the file. It is set here
-      rather than in the build because jpackage does not write a product version into the
-      installer's own version resource: without it the file properties of a signed installer
-      would show an empty product name next to a valid signature.
-    -->
     <pe-file
-      path="Qualia2FA-v${version}.exe"
+      path="Qualia2FA-v*.exe"
       product-name="Qualia2FA"
-      product-version="${version}"
-      file-version="${version}"
       company-name="Qualia2FA"
       copyright="Copyright (c) Qualia2FA contributors">
       <authenticode-sign />
