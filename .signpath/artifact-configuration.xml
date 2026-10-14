@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for the Qualia2FA release artifacts.
+
+  It describes the structure of what is submitted for signing, not how it is signed: the
+  certificate, the signing policy and the approval rules live in the SignPath project. This
+  file is versioned here so that a change to the artifacts and a change to what is signed
+  are reviewed together, and is uploaded to the SignPath project when it changes.
+
+  Schema: http://signpath.io/artifact-configuration/v1
+
+  # What arrives, and why a zip
+
+  The release job produces two installers for one tag, and a SignPath signing request
+  carries one artifact. A `<zip-file>` root is the documented way to sign several files in
+  one request: the job zips `Qualia2FA-v<version>.msi` and `Qualia2FA-v<version>.exe` into
+  `bundle.zip` and submits that. The `version` parameter is passed with the request, so the
+  paths below are checked against the version the tag carries instead of a wildcard that
+  would accept any version.
+
+  # What is signed
+
+  - The MSI installer itself: `<msi-file>` with a trailing `<authenticode-sign/>` signs the
+    package. This is the signature Windows shows in the install dialog and the one that
+    decides whether SmartScreen warns.
+  - The EXE installer: jpackage builds it with Inno Setup, and the result is a Portable
+    Executable, so `<pe-file>` is its element. Its payload is compressed, which is why the
+    application inside cannot be signed through this file.
+
+  # Current state
+
+  Deep signing of the launcher inside the MSI is deliberately **not** enabled. A jpackage
+  MSI lays its files out in a directory named after the package, and signing them requires
+  the exact paths, which are read from an artifact sample rather than guessed: an element
+  that matches nothing is accepted silently, and a configuration that quietly signs less
+  than it claims is worse than one that signs less and says so. Add the paths here once a
+  sample has been uploaded, and the launcher inside the installer gets a signature too.
+
+  Signing the Rust library or the bundled runtime image is deliberately not planned: the
+  runtime comes from the JDK, and putting this project's signature on a third-party binary
+  would claim it as this project's own.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <!-- The application version without the tag's `v`, e.g. `0.0.2`. -->
+    <parameter name="version" required="true" />
+  </parameters>
+
+  <zip-file>
+    <msi-file path="Qualia2FA-v${version}.msi">
+      <authenticode-sign />
+    </msi-file>
+
+    <!--
+      The PE metadata below is what the signature states about the file. It is set here
+      rather than in the build because jpackage does not write a product version into the
+      installer's own version resource: without it the file properties of a signed installer
+      would show an empty product name next to a valid signature.
+    -->
+    <pe-file
+      path="Qualia2FA-v${version}.exe"
+      product-name="Qualia2FA"
+      product-version="${version}"
+      file-version="${version}"
+      company-name="Qualia2FA"
+      copyright="Copyright (c) Qualia2FA contributors">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
