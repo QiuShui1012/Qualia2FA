@@ -187,19 +187,19 @@ private class CodeAnalyzer(private val onFound: (String) -> Unit) : ImageAnalysi
      * A coarse copy of the picture that produced the last code that was read.
      *
      * What matters is not whether the frame before this one differed — a hand holding a device
-     * is never perfectly still, so every frame differs a little — but whether the picture in
-     * front of the camera is still the one that has already been read. A code that changes to
-     * the next image of a sequence differs from it a great deal; the same code held steady does
-     * not, however much the hand moves.
+     * is never perfectly still, so every frame differs a little. The question is whether the
+     * picture in front of the camera is still the one that has already been read. A code that
+     * changes to the next image of a sequence differs from it a great deal; the same code held
+     * steady does not, however much the hand moves.
      */
     private var lastRead: ByteArray? = null
 
     override fun analyze(image: ImageProxy) {
-        try {
-            val gray = image.luma() ?: return
-            val signature = signature(gray, image.width, image.height)
+        image.use { frame ->
+            val gray = frame.luma() ?: return
+            val signature = signature(gray, frame.width, frame.height)
 
-            // A picture that has already been read costs nothing to recognise and would
+            // A picture that has already been read costs nothing to recognize and would
             // otherwise cost a full search, and decoding is what has to keep up with a screen
             // that is cycling through a sequence. A picture that did **not** read is tried again
             // for as long as it stays there, because that is what a frame caught mid-change
@@ -207,7 +207,7 @@ private class CodeAnalyzer(private val onFound: (String) -> Unit) : ImageAnalysi
             val reference = lastRead
             if (reference != null && difference(reference, signature) <= SAME_PICTURE) return
 
-            val text = Qualia.qrTextFromImage(gray, image.width, image.height) ?: return
+            val text = Qualia.qrTextFromImage(gray, frame.width, frame.height) ?: return
             lastRead = signature
             // The same code standing in front of the camera is not news, and reporting it again
             // would only repeat what the user was just told. A different one — the next image of
@@ -215,12 +215,10 @@ private class CodeAnalyzer(private val onFound: (String) -> Unit) : ImageAnalysi
             // while the scanner stays open.
             if (lastReported.getAndSet(text) == text) return
             onFound(text)
-        } finally {
-            image.close()
         }
     }
 
-    /** How much two coarse copies of a frame differ, on average, in grey levels. */
+    /** How much two coarse copies of a frame differ, on average, in gray levels. */
     private fun difference(before: ByteArray, now: ByteArray): Int {
         var total = 0
         for (index in before.indices) {
