@@ -33,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -124,7 +126,10 @@ fun TwoFactorScreen(
     onPersist: () -> Unit,
 ) {
     var entries by remember { mutableStateOf(vault.entries()) }
-    var now by remember { mutableStateOf(currentTimeSeconds()) }
+    // The second the codes and the countdowns are read at, as a state rather than as a value: a
+    // value handed to a card is one of the card's parameters, so a second passing would compose
+    // every card in the list again -- ten of them, for a number each countdown reads for itself.
+    val clock = remember { mutableLongStateOf(currentTimeSeconds()) }
     var message by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf<String?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -194,8 +199,12 @@ fun TwoFactorScreen(
 
     LaunchedEffect(Unit) {
         while (true) {
-            now = currentTimeSeconds()
-            delay(250)
+            val millis = currentTimeMillis()
+            clock.longValue = millis / 1000
+            // Until the second changes, not for a second: a fixed delay from the last wake drifts,
+            // and a countdown that drifts holds one number for longer than a second and then skips
+            // the next one.
+            delay(1000 - millis % 1000)
         }
     }
 
@@ -302,10 +311,16 @@ fun TwoFactorScreen(
             horizontalArrangement = Arrangement.spacedBy(Space.s),
         ) {
             items(entries, key = { it.id }) { entry ->
+                // Read once a second, and the code asked of the library only when its step turns
+                // over: a code is the same value for the whole of its step, and asking for one on
+                // every composition is a crossing into the library per card per frame.
+                val at = clock.value
                 EntryCard(
                     entry = entry,
-                    code = vault.code(entry.id, now),
-                    now = now,
+                    code = remember(entry.id, at / entry.periodSeconds.coerceAtLeast(1)) {
+                        vault.code(entry.id, at)
+                    },
+                    clock = clock,
                     selected = if (selecting) entry.id in selected else null,
                     onToggleSelection = {
                         selected = if (entry.id in selected) selected - entry.id else selected + entry.id
@@ -468,7 +483,7 @@ fun TwoFactorScreen(
 private fun EntryCard(
     entry: Entry,
     code: String?,
-    now: Long,
+    clock: State<Long>,
     selected: Boolean?,
     onToggleSelection: () -> Unit,
     onCopy: (String) -> Unit,
@@ -476,7 +491,6 @@ private fun EntryCard(
     onEdit: () -> Unit,
 ) {
     val period = entry.periodSeconds.coerceAtLeast(1)
-    val remaining = period - (now % period)
     val service = entry.issuer.takeIf { it.isNotBlank() }
     val changing = code != null && !entry.isCounterBased
 
@@ -559,14 +573,16 @@ private fun EntryCard(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = if (changing) stringResource(Res.string.code_changes_in, remaining) else "",
-                        style = MaterialTheme.typography.bodySmall,
+                    CountdownText(
+                        clock = clock,
+                        period = period,
+                        changing = changing,
                         modifier = Modifier.weight(1f),
                     )
                     if (changing) {
-                        CircularProgressIndicator(
-                            progress = { remaining.toFloat() / period.toFloat() },
+                        CountdownRing(
+                            clock = clock,
+                            period = period,
                             modifier = Modifier.size(Sizes.ring).padding(end = Space.s),
                         )
                     }
@@ -575,6 +591,52 @@ private fun EntryCard(
             }
         }
     }
+}
+
+/**
+ * How much of the current step is left, in whole seconds.
+ *
+ * Never zero: a step ends as the next one begins, and a countdown that reached zero would be
+ * saying the code had expired at the moment it changed.
+ */
+private fun remainingSeconds(unixSeconds: Long, period: Long): Int =
+    (period - unixSeconds.mod(period)).toInt()
+
+/**
+ * The seconds left of the current step, read from the clock rather than handed the time.
+ *
+ * The clock changes once a second, which is what this says, so it is composed again when the
+ * number changes and at no other time.
+ */
+@Composable
+private fun CountdownText(
+    clock: State<Long>,
+    period: Long,
+    changing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = if (changing) stringResource(Res.string.code_changes_in, remainingSeconds(clock.value, period)) else "",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The ring that counts the same clock down.
+ *
+ * The clock is read inside the progress lambda, which is evaluated while the ring is drawn, so the
+ * ring follows the clock without this composable being composed again. A ring that follows it
+ * more finely than once a second is possible and was measured: every tick redraws each countdown
+ * on screen, and a state change makes Compose record the display list again, at roughly seventy
+ * milliseconds of the UI thread per second for each additional tick per second.
+ */
+@Composable
+private fun CountdownRing(clock: State<Long>, period: Long, modifier: Modifier = Modifier) {
+    CircularProgressIndicator(
+        progress = { remainingSeconds(clock.value, period).toFloat() / period.toFloat() },
+        modifier = modifier,
+    )
 }
 
 /**
