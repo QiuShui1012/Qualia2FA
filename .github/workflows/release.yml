@@ -20,7 +20,7 @@ jobs:
     name: Verify the tag matches the application version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Compare the tag with versionName
         if: startsWith(github.ref, 'refs/tags/v')
@@ -59,16 +59,16 @@ jobs:
       contents: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate the Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       - name: Make the Gradle wrapper executable
         run: chmod +x gradlew
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -126,7 +126,7 @@ jobs:
           fi
 
       - name: Cache the Rust registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -239,13 +239,13 @@ jobs:
       contents: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate the Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -255,7 +255,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache the Rust registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -329,7 +329,7 @@ jobs:
 
       - name: Upload the unsigned installers as an artifact
         id: unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Qualia2FA-${{ github.ref_name }}-unsigned
           path: unsigned.zip
@@ -342,7 +342,7 @@ jobs:
       # property of the SignPath project, and a copy of it in this file would be one more
       # thing to keep in step. Leaving it empty uses the project's default configuration.
       - name: Submit the signing request
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: "05949a10-8af0-4006-96b0-b1e7041d6831"
