@@ -311,16 +311,59 @@ jobs:
           cp composeApp/build/compose/binaries/main/exe/*.exe "dist/Qualia2FA-${GITHUB_REF_NAME}.exe"
           ls -l dist
 
+      # SignPath signs what one request describes, and a request carries one GitHub Actions
+      # artifact, so the two installers travel together as a zip and come back as the two
+      # files the Release publishes. The artifact configuration describes that zip: an MSI
+      # whose package is signed, and the Inno Setup executable signed as the PE file it is.
+      #
+      # A failure here fails the job on purpose. The installers exist by now, and uploading
+      # them anyway would put unsigned binaries under a release that says it is signed, which
+      # is worse than a release with no Windows artifacts at all.
+      - name: Zip the installers for the signing request
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\*.msi, dist\*.exe -DestinationPath unsigned.zip
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::OpenRead("$PWD/unsigned.zip").Entries |
+            ForEach-Object { Write-Host "  $($_.FullName)" }
+
+      - name: Upload the unsigned installers as an artifact
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qualia2FA-${{ github.ref_name }}-unsigned
+          path: unsigned.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      # The organization, project and policy identify this repository's SignPath project; the
+      # token belongs to a user who is a submitter for that signing policy. The artifact
+      # configuration is a repository variable rather than a literal here: the slug is a
+      # property of the SignPath project, and a copy of it in this file would be one more
+      # thing to keep in step. Leaving it empty uses the project's default configuration.
+      - name: Submit the signing request
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: "05949a10-8af0-4006-96b0-b1e7041d6831"
+          project-slug: "Qualia2FA"
+          signing-policy-slug: "Qualia2FA"
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
       - name: Upload the installers
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ls -l signed
           if gh release upload "$GITHUB_REF_NAME" \
-               dist/*.msi \
-               dist/*.exe \
+               signed/*.msi \
+               signed/*.exe \
                --clobber; then
-            echo "Uploaded the installers to $GITHUB_REF_NAME"
+            echo "Uploaded the signed installers to $GITHUB_REF_NAME"
           else
-            echo "::warning::the installers were built, but uploading them to the Release failed (usually a missing contents: write permission)."
+            echo "::warning::the installers were signed, but uploading them to the Release failed (usually a missing contents: write permission)."
           fi
