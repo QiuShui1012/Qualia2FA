@@ -352,6 +352,14 @@ jobs:
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
           wait-for-completion: true
           output-artifact-directory: signed
+          # The action retries a failing service call for this long before it gives up, and a
+          # 503 is exactly that kind of failure: SignPath answered, and answered "unavailable".
+          # Ten minutes (the default) was not enough, and half an hour costs nothing when the
+          # service is healthy, because the retry loop ends with the first success.
+          service-unavailable-timeout-in-seconds: 1800
+          # The same reasoning for the wait itself: a signing policy may require an approval by
+          # a human, who is not at the keyboard at the moment the job reaches this step.
+          wait-for-completion-timeout-in-seconds: 1800
 
       - name: Upload the installers
         shell: bash
