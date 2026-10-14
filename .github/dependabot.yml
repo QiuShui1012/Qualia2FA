@@ -1,0 +1,25 @@
+# Dependabot for the actions this repository pins, and nothing else.
+#
+# The Gradle ecosystem is deliberately **absent**. The versions of Kotlin, Compose
+# Multiplatform, Gobley and Gradle are pinned to each other on purpose: Gobley 0.3.7
+# generates bindings against UniFFI 0.29.4, and a version bump that looks routine to
+# Dependabot is exactly the one that breaks the generated bindings. Those four move
+# together, by hand, when the binding generator moves.
+#
+# The Rust dependencies are not here either: this repository builds the published
+# `qualia2fa-ffi` crate, so its dependencies belong to that crate's own repository.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns:
+          - "*"
