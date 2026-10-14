@@ -31,7 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** Whether this device has a camera to read a code with. */
 @Composable
@@ -101,7 +101,14 @@ actual fun CameraPreview(
     if (status == CameraStatus.Refused || status == CameraStatus.Failed) return
 
     val owner = activity as? LifecycleOwner ?: return
-    val view = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+                // The whole frame, letterboxed rather than cropped to fill: the analyser searches
+            // every pixel it is given, and a preview that showed less than that would have the
+            // user aiming by a picture that is not the one being read. The window drawn over it
+            // is a hint to the eye, not a region — nothing outside it is ignored.
+            val view =
+                remember {
+                    PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+                }
     val analyzer = remember { Executors.newSingleThreadExecutor() }
     val deliver = rememberUpdatedState(onCode)
 
@@ -174,18 +181,76 @@ private fun analysisResolution(): ResolutionSelector =
  * the frames queued behind it would only delay that.
  */
 private class CodeAnalyzer(private val onFound: (String) -> Unit) : ImageAnalysis.Analyzer {
-    private val found = AtomicBoolean(false)
+    private val lastReported = AtomicReference<String?>(null)
+
+    /**
+     * A coarse copy of the picture that produced the last code that was read.
+     *
+     * What matters is not whether the frame before this one differed — a hand holding a device
+     * is never perfectly still, so every frame differs a little — but whether the picture in
+     * front of the camera is still the one that has already been read. A code that changes to
+     * the next image of a sequence differs from it a great deal; the same code held steady does
+     * not, however much the hand moves.
+     */
+    private var lastRead: ByteArray? = null
 
     override fun analyze(image: ImageProxy) {
         try {
-            if (found.get()) return
             val gray = image.luma() ?: return
+            val signature = signature(gray, image.width, image.height)
+
+            // A picture that has already been read costs nothing to recognise and would
+            // otherwise cost a full search, and decoding is what has to keep up with a screen
+            // that is cycling through a sequence. A picture that did **not** read is tried again
+            // for as long as it stays there, because that is what a frame caught mid-change
+            // looks like: blurry once, then sharp.
+            val reference = lastRead
+            if (reference != null && difference(reference, signature) <= SAME_PICTURE) return
+
             val text = Qualia.qrTextFromImage(gray, image.width, image.height) ?: return
-            if (found.compareAndSet(false, true)) onFound(text)
+            lastRead = signature
+            // The same code standing in front of the camera is not news, and reporting it again
+            // would only repeat what the user was just told. A different one — the next image of
+            // a sequence, most of the time — is, and a payload that needs several codes is read
+            // while the scanner stays open.
+            if (lastReported.getAndSet(text) == text) return
+            onFound(text)
         } finally {
             image.close()
         }
     }
+
+    /** How much two coarse copies of a frame differ, on average, in grey levels. */
+    private fun difference(before: ByteArray, now: ByteArray): Int {
+        var total = 0
+        for (index in before.indices) {
+            total += kotlin.math.abs((before[index].toInt() and 0xFF) - (now[index].toInt() and 0xFF))
+        }
+        return total / before.size
+    }
+}
+
+/** The side of the coarse copy of a frame that [CodeAnalyzer] compares. */
+private const val SIGNATURE_SIDE = 32
+
+/** The average difference, in grey levels, below which two frames are the same picture. */
+private const val SAME_PICTURE = 10
+
+/**
+ * A frame reduced to [SIGNATURE_SIDE]² grey values, sampled evenly across it.
+ *
+ * This is not a picture of the code — a code drawn in these would be unreadable — but it is
+ * enough to tell a still picture from a changed one, which is the only question asked of it.
+ */
+private fun signature(gray: ByteArray, width: Int, height: Int): ByteArray {
+    val out = ByteArray(SIGNATURE_SIDE * SIGNATURE_SIDE)
+    for (y in 0 until SIGNATURE_SIDE) {
+        val source = (y * height / SIGNATURE_SIDE) * width
+        for (x in 0 until SIGNATURE_SIDE) {
+            out[y * SIGNATURE_SIDE + x] = gray[source + x * width / SIGNATURE_SIDE]
+        }
+    }
+    return out
 }
 
 /**
