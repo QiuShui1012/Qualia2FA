@@ -130,8 +130,14 @@ jobs:
           ./gradlew :composeApp:assembleRelease --stacktrace 2>&1 | tee gradle.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            echo "::error::the release APK build failed; the last lines of the run follow"
-            tail -n 40 gradle.log | while IFS= read -r line; do echo "::error::$line"; done
+            # The *cause* is what an annotation has to carry, and a Gradle stack trace ends in
+            # frames that say nothing: the failure line, the task it belongs to and the first
+            # `Caused by` are what identifies it, so those are printed first and the tail only
+            # follows for context.
+            echo "::error::the release APK build failed"
+            grep -n -m 40 -E "What went wrong|Execution failed for task|Caused by:|^e: |error\[|error: " gradle.log \
+              | tail -n 40 | while IFS= read -r line; do echo "::error::$line"; done
+            tail -n 25 gradle.log | while IFS= read -r line; do echo "::error::$line"; done
             df -h /
           fi
           exit "$status"
