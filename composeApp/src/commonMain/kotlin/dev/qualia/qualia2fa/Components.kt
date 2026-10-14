@@ -198,12 +198,12 @@ fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
 /**
  * How long each image of a sequence is shown before the next one.
  *
- * Long enough for a camera to find and read it, twice over: the frame caught while the screen
- * is still changing reads as nothing, and the one behind it needs the time that follows. A
- * code replaced before that has happened is a code the reader never sees, and the user is left
- * holding the device at a screen that cycles faster than it can be read.
+ * Long enough for a camera to find and read it: the frame caught while the screen is still
+ * changing reads as nothing, and the one behind it needs the time that follows. A code replaced
+ * before that has happened is a code the reader never sees, and the user is left holding the
+ * device at a screen that cycles faster than it can be read.
  */
-private const val FRAME_MILLIS = 2400L
+private const val FRAME_MILLIS = 1200L
 
 /** A step's short instruction. */
 @Composable
