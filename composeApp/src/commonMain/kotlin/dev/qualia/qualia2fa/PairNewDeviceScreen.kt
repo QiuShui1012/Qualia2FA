@@ -42,7 +42,7 @@ import org.jetbrains.compose.resources.stringResource
  * The side that already holds the account, in the sync screen's language.
  *
  * It shows a payload for the other device to read, takes that device's request, and hands
- * back a reply. Authorising is the moment the master key is committed to the session, so the
+ * back a reply. Authorizing is the moment the master key is committed to the session, so the
  * requester's identity is shown next to it and the reply is only handed over when the user
  * asks for it: until the reply reaches the other device, nothing has been given away.
  */

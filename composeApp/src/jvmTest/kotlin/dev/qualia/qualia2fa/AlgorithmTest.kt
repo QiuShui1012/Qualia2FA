@@ -190,7 +190,7 @@ class AlgorithmTest {
             Qualia.parseOtpAuth(
                 "otpauth://totp/Qualia:test?secret=JBSWY3DPEHPK3PXP&algorithm=SHA3-256",
             )
-        assertEquals(null, link, "an unrecognised algorithm must not fall back to SHA-1")
+        assertEquals(null, link, "an unrecognized algorithm must not fall back to SHA-1")
     }
 
     /**

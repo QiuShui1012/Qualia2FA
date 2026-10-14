@@ -13,7 +13,7 @@ import kotlin.test.assertNull
  *
  * A reset is the one destructive thing this application offers, so it is checked against the
  * files themselves rather than against a test double: what it promises is that the two files a
- * registered device leaves behind are gone afterwards, and a fake store would only show that
+ * registered device leaves behind are gone afterward, and a fake store would only show that
  * the call was made.
  */
 class StorageTest {

@@ -28,7 +28,7 @@ import java.nio.file.Path
  * # The window
  *
  * The application draws behind the system bars, and the composition is inset by the area they
- * and the display's cutout occupy. The window itself is the plate colour, so what shows at the
+ * and the display's cutout occupy. The window itself is the plate color, so what shows at the
  * edges is the application's own background rather than a flash of the platform's.
  *
  * The keyboard is deliberately **not** part of that inset. The activity asks the platform to
@@ -48,8 +48,8 @@ import java.nio.file.Path
  * # Why the Rust library is loaded here
  *
  * The device identity is a key in the platform keystore, and the platform keystore is reached
- * from Rust over JNI — so that code needs a `JavaVM`, and it takes one in `JNI_OnLoad`, which
- * the runtime calls when the **JVM** loads the library.
+ * from Rust over JNI. That code needs a `JavaVM`, and it takes one in `JNI_OnLoad`, which the
+ * runtime calls when the **JVM** loads the library.
  *
  * JNA, which the generated bindings use to reach everything else, does not load it that way:
  * it opens the file itself, and a library opened that way never sees `JNI_OnLoad`. Without

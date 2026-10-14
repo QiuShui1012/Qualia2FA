@@ -11,13 +11,13 @@ import androidx.compose.ui.unit.dp
 /**
  * The application's visual language.
  *
- * # Where the colours come from
+ * # Where the colors come from
  *
  * They are the mark's own two tones: the plate `#EAF2F4` and the line work `#091012`. The
  * plate is the background, white is for the surfaces that sit on it, and the ink carries the
- * text and the primary action. There is deliberately **no third colour** — the countdown
+ * text and the primary action. There is deliberately **no third color** — the countdown
  * ring, the selected navigation item and every button are ink — because the mark is a
- * two-tone drawing and adding a brand colour would be inventing one. The only other colour
+ * two-tone drawing and adding a brand color would be inventing one. The only other color
  * is the deep red for errors, which is a signal rather than a style.
  *
  * # Shapes
@@ -50,7 +50,7 @@ private val MutedInk = Color(0xFF44545A)
 /** A deep red for errors: dark enough to read as "stop" without introducing a second hue. */
 private val Alert = Color(0xFF8C1D18)
 
-/** The colour scheme, built from the mark. */
+/** The color scheme, built from the mark. */
 private val QualiaColors =
     lightColorScheme(
         primary = Ink,

@@ -21,7 +21,7 @@ interface VaultStorage {
      * a key without a vault opens nothing, and a vault without its key can never be read again
      * on this device. What survives is what was exported or synced elsewhere.
      *
-     * Removing something that is not there is not an error: a device that was never registered
+     * Removing something that is absent is not an error: a device that was never registered
      * has nothing to remove, and asking for a reset is still a reasonable thing to have done.
      */
     fun reset()

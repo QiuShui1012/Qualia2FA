@@ -53,7 +53,7 @@ actual fun hasCamera(): Boolean {
  * image it takes, and it runs on the analysis thread — never on the one drawing, because it
  * is a blocking call into Rust.
  *
- * Only one frame is analysed at a time ([ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST]): a code is
+ * Only one frame is analyzed at a time ([ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST]): a code is
  * read from a still frame, and queueing frames behind a slow decode would only add latency to
  * the frame that matters.
  *
@@ -101,14 +101,14 @@ actual fun CameraPreview(
     if (status == CameraStatus.Refused || status == CameraStatus.Failed) return
 
     val owner = activity as? LifecycleOwner ?: return
-                // The whole frame, letterboxed rather than cropped to fill: the analyser searches
-            // every pixel it is given, and a preview that showed less than that would have the
-            // user aiming by a picture that is not the one being read. The window drawn over it
-            // is a hint to the eye, not a region — nothing outside it is ignored.
-            val view =
-                remember {
-                    PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
-                }
+    // The whole frame, letterboxed rather than cropped to fill: the analyzer searches
+    // every pixel it is given, and a preview that showed less than that would have the
+    // user aiming by a picture that is not the one being read. The window drawn over it
+    // is a hint to the eye, not a region — nothing outside it is ignored.
+    val view =
+        remember {
+            PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+        }
     val analyzer = remember { Executors.newSingleThreadExecutor() }
     val deliver = rememberUpdatedState(onCode)
 
@@ -233,11 +233,11 @@ private class CodeAnalyzer(private val onFound: (String) -> Unit) : ImageAnalysi
 /** The side of the coarse copy of a frame that [CodeAnalyzer] compares. */
 private const val SIGNATURE_SIDE = 32
 
-/** The average difference, in grey levels, below which two frames are the same picture. */
+/** The average difference, in gray levels, below which two frames are the same picture. */
 private const val SAME_PICTURE = 10
 
 /**
- * A frame reduced to [SIGNATURE_SIDE]² grey values, sampled evenly across it.
+ * A frame reduced to [SIGNATURE_SIDE]² gray values, sampled evenly across it.
  *
  * This is not a picture of the code — a code drawn in these would be unreadable — but it is
  * enough to tell a still picture from a changed one, which is the only question asked of it.
@@ -256,9 +256,9 @@ private fun signature(gray: ByteArray, width: Int, height: Int): ByteArray {
 /**
  * The luma plane of a YUV frame, one byte per pixel, row major.
  *
- * The plane's rows are usually padded to a stride longer than the image is wide and its
- * pixels are usually one byte apart, but neither is guaranteed by the format, so both are
- * read from the plane rather than assumed.
+ * The plane's rows are usually padded to a stride longer than the image is wide, and its
+ * pixels are usually one byte apart. Neither is guaranteed by the format, so both are read
+ * from the plane rather than assumed.
  */
 private fun ImageProxy.luma(): ByteArray? {
     val plane = planes.firstOrNull() ?: return null

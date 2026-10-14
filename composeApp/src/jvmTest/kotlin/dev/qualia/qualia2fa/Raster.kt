@@ -16,7 +16,7 @@ internal class Raster(val width: Int, val height: Int, val pixels: ByteArray) {
     /** Whether the pixel at [index] is opaque enough to count as drawn. */
     fun isDrawn(index: Int): Boolean = ((pixels[index * 4 + 3].toInt() and 0xFF) >= 128)
 
-    /** The three colour channels of the pixel at [index], in the platform's own order. */
+    /** The three color channels of the pixel at [index], in the platform's own order. */
     fun channels(index: Int): IntArray =
         intArrayOf(
             pixels[index * 4].toInt() and 0xFF,

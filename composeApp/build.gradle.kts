@@ -82,7 +82,7 @@ if (materializedVersion != ffiCrateVersion) {
 
 kotlin {
     jvm()
-    // The Android target is a separate platform, not a flavour of the desktop one: it gets
+    // The Android target is a separate platform, not a flavor of the desktop one: it gets
     // its own source set, its own entry point and its own platform key store. What the two
     // share — the file-backed storage, the clock, the encodings — lives in `androidJvmMain`,
     // which both depend on, so that "how the vault is written" exists once.
@@ -117,7 +117,7 @@ kotlin {
                 implementation(libs.androidxCameraLifecycle)
                 implementation(libs.androidxCameraView)
                 // UniFFI's Kotlin bindings load the Rust library through JNA. The `aar`
-                // flavour is the one that carries JNA's dispatcher for Android, and 5.17 or
+                // flavor is the one that carries JNA's dispatcher for Android, and 5.17 or
                 // newer is what understands 16 KB page sizes.
                 implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
             }

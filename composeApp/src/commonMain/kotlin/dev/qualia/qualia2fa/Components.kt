@@ -218,13 +218,13 @@ fun Hint(text: String) {
  *
  * A chip draws its hover over a container that is transparent when it is not selected, so
  * what the pointer highlights is a state layer rather than the control's own surface: the
- * colour around the label and the colour the rest of the chip takes come from two different
+ * color around the label and the color the rest of the chip takes come from two different
  * places, and they do not match. Here each option is **one** surface with **one** background
  * — the label sits on it, so there is nothing to mismatch.
  *
  * The highlight ramps **linearly** over [CHOICE_FADE_MS]. The shape of that ramp is what makes
  * it look smooth, not its length: an eased curve spends the first frames barely moving and
- * then crosses most of the colour in the middle, so at sixty frames a second it arrives in a
+ * then crosses most of the color in the middle, so at sixty frames a second it arrives in a
  * handful of visible steps. A longer tween only spreads the same steps out, and an eased one
  * is worse the shorter it is; a constant rate gives every frame an equal share of the change,
  * which is the smoothest a fade this small can be.
@@ -254,7 +254,7 @@ fun <T> ChoiceRow(
                 when {
                     isSelected -> MaterialTheme.colorScheme.primary
                     else ->
-                        // One colour for the whole segment: the surface, moved towards the
+                        // One color for the whole segment: the surface, moved towards the
                         // ink by the faded amount.
                         lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.primary, highlight * HOVER_TINT)
                 }
@@ -291,13 +291,13 @@ fun <T> ChoiceRow(
     }
 }
 
-/** How long an option takes to reach its hover colour, at a constant rate. */
+/** How long an option takes to reach its hover color, at a constant rate. */
 private const val CHOICE_FADE_MS = 120
 
 /** How far an unselected option moves towards the ink while the pointer is over it. */
 private const val HOVER_TINT = 0.10f
 
-/** A failure or a result, in the colour that says which it is. */
+/** A failure or a result, in the color that says which it is. */
 @Composable
 fun MessageLine(message: String?, isError: Boolean = true) {
     message ?: return
@@ -316,8 +316,9 @@ fun MessageLine(message: String?, isError: Boolean = true) {
  * A dialog here is a form, and a form is not something to throw away: a click that lands
  * outside the window is not a decision to discard what has been typed, so the ways out are
  * Cancel and Back, which are both there and both deliberate. Compose also dismisses a dialog
- * on a motion event it merely *observes* outside one, whether or not the user meant it, so
- * leaving the property at its default would put the typed input at the mercy of a stray event.
+ * on a motion event it merely *observes* outside one, whether the user meant it or not.
+ * Leaving the property at its default would therefore put the typed input at the mercy of a
+ * stray event.
  */
 internal val DialogDefaults = DialogProperties(dismissOnClickOutside = false)
 

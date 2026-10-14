@@ -133,8 +133,8 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
     /**
      * Reads the vault this device already has, and goes wherever that leads.
      *
-     * The loading screen stays up for at least [LOADING_MINIMUM], whether or not there was
-     * anything to wait for: opening a vault is a key store access and a file read, and on a
+     * The loading screen stays up for at least [LOADING_MINIMUM], whether there was anything
+     * to wait for or not: opening a vault is a key store access and a file read, and on a
      * warm device both are over before the first frame is drawn. A screen that appears and
      * vanishes inside a frame reads as a flicker rather than as progress.
      */

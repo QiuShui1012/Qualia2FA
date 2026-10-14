@@ -3,9 +3,9 @@
   The window the composition is drawn in. There is no action bar: every piece of navigation in
   this application belongs to the interface itself.
 
-  The background is the plate colour, so the moment between the launcher and the first frame is
-  the colour of the application rather than a flash of white, and it is also what shows behind
-  the status bar while the composition keeps clear of it.
+  The background is the plate color, so the moment between the launcher and the first frame is
+  the color of the application rather than a flash of white. It is also what shows behind the
+  status bar while the composition keeps clear of it.
 -->
 <resources>
     <style name="Theme.Qualia2FA" parent="@android:style/Theme.Material.Light.NoActionBar">

@@ -165,8 +165,8 @@ fun TwoFactorScreen(
      * Adds the entry an `otpauth://` link describes, and says what happened.
      *
      * One function for both ways in — out of an image and off the clipboard — because they
-     * differ only in how the text is obtained, and two copies of the entry-building rules
-     * would be two places for them to drift apart.
+     * differ only in how the text is obtained. Two copies of the entry-building rules would
+     * be two places for them to drift apart.
      */
     fun addFrom(text: String) {
         val link = Qualia.parseOtpAuth(text)
@@ -181,7 +181,7 @@ fun TwoFactorScreen(
                 issuer = link.issuer,
                 account = link.account,
                 secretBase32 = link.secretBase32,
-                // The link's own algorithm, not this application's default: a SHA-256 link
+                // The link's own algorithm, not this application's default: an SHA-256 link
                 // imported as SHA-1 would produce codes that look right and never work.
                 algorithm = link.algorithm,
                 digits = link.digits,
@@ -471,9 +471,9 @@ fun TwoFactorScreen(
  * Three lines, each with one thing to read on the left and the action that belongs to it on
  * the right: the name with its service beside it and **copy**, the code and **edit**, and when
  * the code changes next with the countdown ring and **delete**. The destructive action ends up
- * on the bottom line, where it belongs, and the ring sits immediately to its left — what is
- * counting down and what would destroy it are read together rather than the ring floating
- * beside the code.
+ * on the bottom line, where it belongs, and the ring sits immediately to its left. What is
+ * counting down and what would destroy it are then read together, rather than the ring
+ * floating beside the code.
  *
  * The account and the algorithm are deliberately **not** shown: they are what the editor is
  * for, and on a card that is one column of several they would cost a line each for something

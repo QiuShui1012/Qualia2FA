@@ -20,6 +20,6 @@ object AppPaths {
             ?.let { Paths.get(it, "Qualia2FA") }
             ?: Paths.get(System.getProperty("user.home"), ".qualia2fa")
 
-    /** The user's preferences; nothing in it is secret and it is not needed to unlock. */
+    /** The user's preferences; nothing in it is secret, and it is not needed to unlock. */
     val settingsFile: Path = dataDirectory.resolve("settings.properties")
 }

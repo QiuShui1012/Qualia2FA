@@ -96,7 +96,7 @@ class StringsTest {
         }
 
     /**
-     * A placeholder is filled in, and the words around it come from the catalogue.
+     * A placeholder is filled in, and the surrounding words come from the catalogue.
      *
      * The interface has no plural forms at the moment: the counts it shows read the same in
      * both languages ("1 selected", "已选 1 项"), so there is no quantity string to pin.

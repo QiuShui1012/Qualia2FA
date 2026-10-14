@@ -80,7 +80,7 @@ internal fun Brand(showTitle: Boolean, logoSize: androidx.compose.ui.unit.Dp = S
     }
 }
 
-/** The ring, and the only thing on the screen a screen reader has to announce. */
+/** The ring: the only thing on the screen a screen reader has to announce. */
 @Composable
 private fun LoadingRing() {
     val description = stringResource(Res.string.cd_loading)

@@ -97,8 +97,8 @@ fun LoginScreen(
                 }
             }
         } else {
-            // Centred inside a box that scrolls: centred when the window has room, and
-            // reachable in full when it does not, which a centred column on its own is not
+            // Centered inside a box that scrolls: centered when the window has room, and
+            // reachable in full when it does not, which a centered column on its own is not
             // — a scrollable column is only as tall as its content.
             Box(
                 modifier = Modifier.fillMaxSize().padding(Space.xl),
@@ -130,7 +130,7 @@ private fun Actions(
     onJoin: () -> Unit,
     onUnlock: () -> Unit,
 ) {
-    val warningColour = MaterialTheme.colorScheme.error
+    val warningColor = MaterialTheme.colorScheme.error
 
     Column(
         modifier = Modifier.widthIn(max = 420.dp),
@@ -150,7 +150,7 @@ private fun Actions(
                     Text(
                         stringResource(Res.string.first_run_no_hardware_warning),
                         style = MaterialTheme.typography.bodySmall,
-                        color = warningColour,
+                        color = warningColor,
                     )
                 }
                 Hint(stringResource(Res.string.first_run_join_explainer))
@@ -172,7 +172,7 @@ private fun Actions(
                 Text(
                     stringResource(Res.string.login_key_unreadable),
                     style = MaterialTheme.typography.bodySmall,
-                    color = warningColour,
+                    color = warningColor,
                 )
                 Button(onClick = onUnlock, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(Res.string.action_unlock))
@@ -187,7 +187,7 @@ private fun Actions(
                 Text(
                     stringResource(Res.string.login_vault_missing),
                     style = MaterialTheme.typography.bodySmall,
-                    color = warningColour,
+                    color = warningColor,
                 )
                 // Logging in from another device of the same account brings back both the
                 // master key and, through a sync, the entries. Creating a vault would not:

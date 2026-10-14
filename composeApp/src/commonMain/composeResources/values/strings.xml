@@ -88,7 +88,7 @@
 
     <!-- Results of entry operations -->
     <string name="message_entry_imported">The entry was imported.</string>
-    <string name="error_image_unreadable">No image was read (the dialog was cancelled, or the file cannot be decoded).</string>
+    <string name="error_image_unreadable">No image was read (the dialog was canceled, or the file cannot be decoded).</string>
     <string name="error_image_has_no_entry">This image holds no readable entry code (an otpauth:// QR code is expected).</string>
     <string name="error_entry_rejected">The entry was not accepted: the secret or the parameters are not valid.</string>
     <string name="error_entry_not_saved">Nothing was saved: the secret or the parameters are not accepted (the secret must be valid Base32).</string>

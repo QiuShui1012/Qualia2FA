@@ -154,8 +154,8 @@ private fun write(context: Context, uri: Uri, bytes: ByteArray): String? =
  * Decodes the image at [uri] into grayscale pixels, downscaled to [MAX_IMAGE_EDGE].
  *
  * The conversion is the simple luma weighting (0.299/0.587/0.114) rather than a plain
- * average: a code's dark and light modules can differ in colour as much as in brightness,
- * and averaging channels makes coloured modules harder to tell apart, not easier.
+ * average: a code's dark and light modules can differ in color as much as in brightness,
+ * and averaging channels makes colored modules harder to tell apart, not easier.
  *
  * The size is read first, without decoding anything, so that a picture far larger than the
  * decoder needs is sampled down on the way in instead of being held in memory whole.
@@ -191,13 +191,13 @@ private fun decodeGray(context: Context, uri: Uri): GrayPixels? {
 
     val width = bitmap.width
     val height = bitmap.height
-    val colours = IntArray(width * height)
-    bitmap.getPixels(colours, 0, width, 0, 0, width, height)
+    val colors = IntArray(width * height)
+    bitmap.getPixels(colors, 0, width, 0, 0, width, height)
     bitmap.recycle()
 
     val gray = ByteArray(width * height)
-    for (index in colours.indices) {
-        val rgb = colours[index]
+    for (index in colors.indices) {
+        val rgb = colors[index]
         val r = (rgb shr 16) and 0xFF
         val g = (rgb shr 8) and 0xFF
         val b = rgb and 0xFF

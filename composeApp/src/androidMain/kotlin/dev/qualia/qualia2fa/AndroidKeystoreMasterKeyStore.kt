@@ -39,9 +39,9 @@ import javax.crypto.spec.GCMParameterSpec
  *
  * A key that can go in the StrongBox is asked to, when the device advertises one: it is the
  * more isolated of the two, and it is slower, which does not matter for an operation that
- * happens once per unlock. A device that has the feature but cannot honour the request is
- * answered with the ordinary keystore rather than refused, since that is a difference in how
- * well the key is protected, not in whether the vault can be opened.
+ * happens once per unlock. A device that has the feature but cannot honor the request is
+ * answered with the ordinary keystore rather than refused. That is a difference in how well
+ * the key is protected, not in whether the vault can be opened.
  */
 class AndroidKeystoreMasterKeyStore(
     private val path: Path,

@@ -70,9 +70,9 @@ fun AppLanguage.label(): String =
  *
  * A value rather than a translated string: the language can be switched while the screen is
  * up, and a stored `String` would keep the language it was built in. Only the ways a vault
- * *becomes* locked are here — "opened" and "created" are not states the interface shows,
- * because what is worth telling the user about a key store belongs in the settings, where it
- * stays readable instead of passing by.
+ * *becomes* locked are here — "opened" and "created" are not states the interface shows.
+ * What is worth telling the user about a key store belongs in the settings, where it stays
+ * readable instead of passing by.
  */
 sealed interface Status {
     /** The user locked the vault from the settings. */

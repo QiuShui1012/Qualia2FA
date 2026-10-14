@@ -48,8 +48,8 @@ import org.jetbrains.compose.resources.stringResource
  * A code the application is asking the user for, and what to do with what comes back.
  *
  * The two failures are the same everywhere a code is read — the image could not be read at
- * all, or it was read and held no code — and they are passed in rather than resolved here
- * because the screens word them for what they were looking for.
+ * all, or it was read and held no code. They are passed in rather than resolved here, because
+ * the screens word them for what they were looking for.
  */
 class ScanRequest(
     val unreadable: String,
@@ -190,7 +190,7 @@ private val FRAME_WIDTH = 3.dp
  * that is not on a screen.
  *
  * The way in is a button with no text on it, in the corner of the view: it is the second way
- * to do the same thing rather than a second thing to do, and a labelled button beside the
+ * to do the same thing rather than a second thing to do, and a labeled button beside the
  * camera would read as the point of the screen. What it does is written down in the hint.
  *
  * A code that is read closes the scanner and goes to the screen that asked; a code that is
@@ -223,7 +223,7 @@ fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) 
     }
 
     // The scanner is drawn over the screen that asked for it rather than in place of it, so
-    // it has to be opaque and it has to take the touches: what is underneath is still there,
+    // it has to be opaque, and it has to take the touches: what is underneath is still there,
     // and a tap that fell through it would work a control the user cannot see.
     Surface(
         modifier =

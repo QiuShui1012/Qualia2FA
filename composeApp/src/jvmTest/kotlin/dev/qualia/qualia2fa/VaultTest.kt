@@ -49,7 +49,7 @@ class VaultTest {
      * A whole pairing, both sides, in one process.
      *
      * The host registers, starts a pairing and hands out its payload; the joiner reads it,
-     * sends a request, and the host authorises it, which is the call that hands over the
+     * sends a request, and the host authorizes it, which is the call that hands over the
      * master key. The joiner must then be able to open the **host's** vault file, which is
      * the property that makes the whole flow worth anything.
      *
@@ -81,7 +81,7 @@ class VaultTest {
         val requestText = assertNotNull(joiner.requestText(), "the joiner must produce a request")
         assertNotNull(joiner.identity(), "the joiner must have an identity once it asked")
 
-        val replyText = assertNotNull(host.replyTo(requestText, hostVault), "the host must authorise the request")
+        val replyText = assertNotNull(host.replyTo(requestText, hostVault), "the host must authorize the request")
         assertNotNull(host.joinerDeviceId, "the host must be able to show who is asking")
 
         val joinerStore = MemoryStore()

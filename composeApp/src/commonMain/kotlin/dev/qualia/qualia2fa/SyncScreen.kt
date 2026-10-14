@@ -74,15 +74,16 @@ import org.jetbrains.compose.resources.stringResource
  *
  * *Syncing* moves entries between two devices that already share the account, and *pairing*
  * hands the account to a device that does not have it yet. They are the same kind of
- * operation — a code the user carries from one device to the other — and the design puts
- * them in the same place by giving this tab to "sync" and the login screen to the joining
- * side. Pairing is the reverse of that login, so it belongs on this screen.
+ * operation — a code the user carries from one device to the other — so the design gives
+ * them one place. This tab is the "sync" side; the login screen is the joining side.
+ * Pairing is the reverse of that login, so it belongs on this screen.
  *
  * # Without navigation
  *
  * The design asks for the sync screen **without** navigation in the login flow. That is
  * [JoinAccountScreen], which is the joining side of a pairing rendered in this screen's
- * language; this composable is the tab, and the tab always has the navigation around it.
+ * language; this composable is the tab, and a tab always comes with the surrounding
+ * navigation.
  */
 @Composable
 fun SyncScreen(

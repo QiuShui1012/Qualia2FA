@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
  *
  * # The icons are drawn through `Icon`
  *
- * Their own colours are placeholders: `Icon` tints whatever it is given. What matters is the
+ * Their own colors are placeholders: `Icon` tints whatever it is given. What matters is the
  * shape's coverage — enough pixels to be a glyph, not so many that it is a filled square
  * (which is what a broken view box produces).
  */

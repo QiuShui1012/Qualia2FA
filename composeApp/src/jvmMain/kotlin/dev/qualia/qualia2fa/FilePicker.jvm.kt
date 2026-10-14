@@ -13,8 +13,9 @@ import javax.swing.filechooser.FileNameExtensionFilter
  * The desktop file picker: a Swing dialog, answered before the call returns.
  *
  * The dialog runs on the calling thread, which is the user interface thread: that is what
- * makes it modal to the window and is the usual Swing arrangement. [onResult] is therefore
- * called before this returns, and a caller may rely on neither more nor less than that.
+ * makes it modal to the window and is the usual Swing arrangement. The `onResult` callback of
+ * the picker is therefore called before this returns, and a caller may rely on neither more
+ * nor less than that.
  *
  * The image extensions offered are the ones `ImageIO` reads without an extra plugin; a file
  * in another format is reported as unreadable rather than guessed at.
@@ -96,8 +97,8 @@ private class DesktopFilePicker : FilePicker {
      * Reads an image file and converts it to grayscale.
      *
      * The conversion is the simple luma weighting (0.299/0.587/0.114) rather than a plain
-     * average: a code's dark and light modules can differ in colour as much as in brightness,
-     * and averaging channels makes coloured modules harder to tell apart, not easier.
+     * average: a code's dark and light modules can differ in color as much as in brightness,
+     * and averaging channels makes colored modules harder to tell apart, not easier.
      */
     private fun decodeGray(file: File): GrayPixels? {
         val image: BufferedImage =

@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * it here, through the parser the interface uses, turns that into a failing test.
  *
  * The mark is the one drawing that is not a glyph: it is a plate with line work on it, and it
- * is drawn untinted, so its own two colours are what the interface shows. The checks below
+ * is drawn untinted, so its own two colors are what the interface shows. The checks below
  * are about that composition — a rounded plate rather than a square one, enough line work to
  * read as the mark, and nothing in between that is neither.
  */

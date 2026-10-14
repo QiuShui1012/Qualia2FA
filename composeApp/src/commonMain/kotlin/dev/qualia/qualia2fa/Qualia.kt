@@ -139,8 +139,8 @@ class Vault internal constructor(private val inner: FfiVault) {
      * Adds an entry and returns its identifier, or `null` when the secret or the
      * parameters are rejected.
      *
-     * [algorithm] is required rather than defaulted: a default here would be the one place a
-     * SHA-256 link could quietly become a SHA-1 entry, and the codes would be wrong rather
+     * [algorithm] is required rather than defaulted: a default here would be the one place an
+     * SHA-256 link could quietly become an SHA-1 entry, and the codes would be wrong rather
      * than missing.
      */
     fun addEntry(
@@ -202,7 +202,7 @@ class Vault internal constructor(private val inner: FfiVault) {
         }
 
     /**
-     * Authorises [host]'s pairing request with this vault's key.
+     * Authorizes [host]'s pairing request with this vault's key.
      *
      * This is the moment the master key is handed to the other device, so the caller must
      * have asked the user first, and should show [PairingHost.joinerDeviceId] while doing
@@ -527,8 +527,8 @@ object Qualia {
         try {
             // The text of whichever code is in the picture, exactly as the code carries it. A
             // screen that wants the content of this application's own code unwraps it with
-            // [unwrapQrText], and one that collects a split payload hands the text to a
-            // [QrFrameCollector] — which is the only thing that knows how many codes there are.
+            // [unwrapQrText]. A screen that collects a split payload hands the text to a
+            // [QrFrameCollector], which is the only thing that knows how many codes there are.
             ffiQrDecodeText(pixels, width.toUInt(), height.toUInt())
         } catch (_: Exception) {
             null
@@ -640,7 +640,7 @@ private const val MAX_FRAMES: UInt = 64u
      * Opens a synchronization session for [vault], claiming [deviceId] on the channel.
      *
      * Returns `null` when the session cannot be created. The vault is **mutated** by a merge
-     * and by every decision, so the caller has to serialize it afterwards.
+     * and by every decision, so the caller has to serialize it afterward.
      */
     fun syncSession(vault: Vault, deviceId: String): SyncSession? =
         try {
@@ -1035,8 +1035,8 @@ class PairingJoiner internal constructor(
      * Completes the pairing from the host's reply.
      *
      * Verifies the reply, writes the master key into [store] and returns the vault it
-     * unlocks, or `null` when the reply did not verify — a wrong session, a tampered
-     * message, or a host using a different master key all look the same from here.
+     * unlocks, or `null` when the reply did not verify. A wrong session, a tampered message,
+     * and a host using a different master key all look the same from here.
      */
     fun complete(reply: ByteArray, store: MasterKeyStore): Vault? =
         try {
@@ -1074,7 +1074,7 @@ data class OtpAuthLink(
     val secretBase32: String,
     /**
      * The algorithm the link names, which is SHA-1 when it names none — the scheme's own
-     * default. It is carried into the entry: importing a SHA-256 link as a SHA-1 entry would
+     * default. It is carried into the entry: importing an SHA-256 link as an SHA-1 entry would
      * produce codes that look right and are always wrong.
      */
     val algorithm: OtpAlgorithm,

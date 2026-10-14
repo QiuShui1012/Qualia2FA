@@ -86,22 +86,22 @@ internal object Vector {
         val path = PathParser().parsePathString(data).toPath(Path())
         val skia = path.asSkiaPath()
 
-        element.colour("fillColor")?.let { colour ->
+        element.color("fillColor")?.let { fill ->
             drawPath(
                 skia,
                 Paint().apply {
-                    color = colour
+                    color = fill
                     mode = PaintMode.FILL
                     isAntiAlias = true
                 },
             )
         }
 
-        element.colour("strokeColor")?.let { colour ->
+        element.color("strokeColor")?.let { stroke ->
             drawPath(
                 skia,
                 Paint().apply {
-                    color = colour
+                    color = stroke
                     mode = PaintMode.STROKE
                     isAntiAlias = true
                     strokeWidth = element.attribute("strokeWidth")?.toFloat() ?: 1f
@@ -136,7 +136,7 @@ internal object Vector {
     private fun Element.number(name: String, fallback: Float): Float =
         attribute(name)?.toFloat() ?: fallback
 
-    /** A `#AARRGGBB` attribute as Skia's colour, or `null` when it is not there. */
-    private fun Element.colour(name: String): Int? =
+    /** A `#AARRGGBB` attribute as Skia's color, or `null` when it is not there. */
+    private fun Element.color(name: String): Int? =
         attribute(name)?.removePrefix("#")?.toLong(16)?.toInt()
 }
