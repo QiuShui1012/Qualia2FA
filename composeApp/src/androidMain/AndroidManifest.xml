@@ -16,8 +16,15 @@
         android:name="android.hardware.camera.any"
         android:required="false" />
 
+    <!--
+      Nothing is backed up and nothing is transferred to another device: the vault is the one
+      file this application exists to keep here, and the export the user asks for is the only
+      way it should leave. `allowBackup` and `fullBackupContent` are what Android 11 and lower
+      read; Android 12 and higher read `dataExtractionRules`.
+    -->
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
