@@ -109,7 +109,6 @@
     <string name="field_peer_code">The other device's sync code</string>
     <string name="action_scan_code">Scan the code</string>
     <string name="action_merge">Merge it</string>
-    <string name="sync_message_code_read">The sync code was read from the image.</string>
     <string name="sync_error_no_code_in_image">This image holds no readable sync code.</string>
     <string name="sync_error_code_rejected">This code was not accepted: it is not a sync code, or it does not belong to this account.</string>
     <string name="sync_error_already_applied">This code was already applied.</string>

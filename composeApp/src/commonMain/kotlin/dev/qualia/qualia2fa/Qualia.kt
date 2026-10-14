@@ -1088,13 +1088,13 @@ data class OtpAuthLink(
  * It forwards and decides nothing, which is the whole contract of that interface.
  */
 private class StoreBridge(private val inner: MasterKeyStore) : FfiSecureStore {
-    override fun `loadMasterKey`(): ByteArray? = inner.load()
+    override fun loadMasterKey(): ByteArray? = inner.load()
 
-    override fun `storeMasterKey`(`key`: ByteArray) = inner.store(key)
+    override fun storeMasterKey(key: ByteArray) = inner.store(key)
 
-    override fun `deleteMasterKey`() = inner.delete()
+    override fun deleteMasterKey() = inner.delete()
 
-    override fun `isHardwareBacked`(): Boolean = inner.isHardwareBacked
+    override fun isHardwareBacked(): Boolean = inner.isHardwareBacked
 }
 
 /**
@@ -1104,9 +1104,9 @@ private class StoreBridge(private val inner: MasterKeyStore) : FfiSecureStore {
  * is the same one and is not used again here. It forwards and decides nothing.
  */
 private class PlatformKeysBridge(private val inner: FfiPlatformKeys) : FfiDeviceKeys {
-    override fun `getOrCreate`(`label`: String): ByteArray = inner.devicePublicKey()
+    override fun getOrCreate(label: String): ByteArray = inner.devicePublicKey()
 
-    override fun `sign`(`label`: String, `message`: ByteArray): ByteArray = inner.sign(message)
+    override fun sign(label: String, message: ByteArray): ByteArray = inner.sign(message)
 }
 
 /**

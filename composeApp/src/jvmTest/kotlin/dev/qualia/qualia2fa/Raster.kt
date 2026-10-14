@@ -24,15 +24,6 @@ internal class Raster(val width: Int, val height: Int, val pixels: ByteArray) {
             pixels[index * 4 + 2].toInt() and 0xFF,
         )
 
-    /** How many pixels satisfy [check], which is given the channels of each pixel. */
-    fun count(check: (IntArray) -> Boolean): Int {
-        var matched = 0
-        for (index in 0 until size) {
-            if (check(channels(index))) matched++
-        }
-        return matched
-    }
-
     companion object {
         /** The pixels of a rendered bitmap. */
         fun of(bitmap: Bitmap): Raster {

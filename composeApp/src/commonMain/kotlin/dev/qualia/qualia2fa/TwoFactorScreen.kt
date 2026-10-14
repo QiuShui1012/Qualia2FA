@@ -2,15 +2,14 @@ package dev.qualia.qualia2fa
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -45,7 +44,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_cancel
 import dev.qualia.qualia2fa.resources.action_copy
@@ -70,7 +68,6 @@ import dev.qualia.qualia2fa.resources.dialog_delete_selected_text
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_title
 import dev.qualia.qualia2fa.resources.dialog_edit_entry
 import dev.qualia.qualia2fa.resources.dialog_import_link
-import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_entry_not_saved
 import dev.qualia.qualia2fa.resources.error_entry_rejected
 import dev.qualia.qualia2fa.resources.error_image_has_no_entry
@@ -85,7 +82,6 @@ import dev.qualia.qualia2fa.resources.field_otpauth_link
 import dev.qualia.qualia2fa.resources.field_period
 import dev.qualia.qualia2fa.resources.field_secret
 import dev.qualia.qualia2fa.resources.field_secret_replace
-import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.hint_link_prefilled
 import dev.qualia.qualia2fa.resources.hint_secret_kept
 import dev.qualia.qualia2fa.resources.icon_add

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -104,7 +103,3 @@ fun MainScreen(
         }
     }
 }
-
-/** The padding a screen's content keeps inside the navigation shell. */
-@Composable
-fun ScreenPadding(): Modifier = Modifier.padding(Space.l)

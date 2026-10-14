@@ -102,7 +102,6 @@
     <string name="field_peer_code">对方的同步码</string>
     <string name="action_scan_code">扫描同步码</string>
     <string name="action_merge">合并</string>
-    <string name="sync_message_code_read">已从图片读入同步码。</string>
     <string name="sync_error_no_code_in_image">这张图片里没有可读的同步码。</string>
     <string name="sync_error_code_rejected">这个码没有被接受：它不是同步码，或者不属于这个账号。</string>
     <string name="sync_error_already_applied">这个码已经合并过了。</string>

@@ -30,10 +30,8 @@ import dev.qualia.qualia2fa.resources.action_pair_new_device
 import dev.qualia.qualia2fa.resources.action_scan_code
 import dev.qualia.qualia2fa.resources.action_restore_entry
 import dev.qualia.qualia2fa.resources.action_take_incoming
-import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.field_peer_code
-import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.message_copied
 import dev.qualia.qualia2fa.resources.nav_sync
 import dev.qualia.qualia2fa.resources.sync_conflict_entry_mismatch
@@ -57,7 +55,6 @@ import dev.qualia.qualia2fa.resources.sync_error_nothing_to_read
 import dev.qualia.qualia2fa.resources.sync_error_other
 import dev.qualia.qualia2fa.resources.sync_error_sender_mismatch
 import dev.qualia.qualia2fa.resources.sync_intro
-import dev.qualia.qualia2fa.resources.sync_message_code_read
 import dev.qualia.qualia2fa.resources.sync_my_code_explainer
 import dev.qualia.qualia2fa.resources.sync_pair_explainer
 import dev.qualia.qualia2fa.resources.sync_pair_section
@@ -112,7 +109,6 @@ fun SyncScreen(
     val copied = stringResource(Res.string.message_copied)
     val unreadableImage = stringResource(Res.string.error_image_unreadable)
     val noCodeInImage = stringResource(Res.string.sync_error_no_code_in_image)
-    val codeRead = stringResource(Res.string.sync_message_code_read)
     val notSaved = stringResource(Res.string.sync_error_not_saved)
     val decisionRefused = stringResource(Res.string.sync_error_decision_refused)
     val scanner = LocalCodeScanner.current
@@ -218,30 +214,28 @@ fun SyncScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.m),
             ) {
-            OutlinedButton(onClick = {
-                scanner.readCode(
-                    unreadable = unreadableImage,
-                    noCode = noCodeInImage,
-                    onFrame = { collect(it) },
-                    onText = { scanned ->
-                        val payload = completedPayload
-                        completedPayload = null
-                        merge(payload ?: Qualia.unwrapQrText(scanned) ?: scanned)
-                    },
-                    onMessage = { message = it },
-                )
-            }) {
-                Text(stringResource(Res.string.action_scan_code))
-            }
-            collected?.let { (received, expected) ->
-                Text(stringResource(Res.string.sync_frames_count, received, expected ?: received))
-            }
+                OutlinedButton(onClick = {
+                    scanner.readCode(
+                        unreadable = unreadableImage,
+                        noCode = noCodeInImage,
+                        onFrame = { collect(it) },
+                        onText = { scanned ->
+                            val payload = completedPayload
+                            completedPayload = null
+                            merge(payload ?: Qualia.unwrapQrText(scanned) ?: scanned)
+                        },
+                        onMessage = { message = it },
+                    )
+                }) {
+                    Text(stringResource(Res.string.action_scan_code))
+                }
+                collected?.let { (received, expected) ->
+                    Text(stringResource(Res.string.sync_frames_count, received, expected ?: received))
+                }
             }
             Button(onClick = { merge(peerCode.trim()) }, enabled = peerCode.isNotBlank()) {
                 Text(stringResource(Res.string.action_merge))
             }
-
-
 
             outcome?.let { result ->
                 MessageLine(
@@ -319,7 +313,7 @@ private fun ConflictCard(conflict: SyncConflict, onDecide: (Boolean) -> Unit) {
         SideRow(stringResource(Res.string.sync_conflict_side_local), conflict.local)
         SideRow(stringResource(Res.string.sync_conflict_side_incoming), conflict.incoming)
 
-        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
             OutlinedButton(onClick = { onDecide(false) }) {
                 Text(
                     when (conflict.kind) {
