@@ -5,7 +5,7 @@
   It describes the structure of what is submitted for signing, not how it is signed: the
   certificate, the signing policy and the approval rules live in the SignPath project. This
   file is versioned here so that a change to the artifacts and a change to what is signed
-  are reviewed together, and is uploaded to the SignPath project when it changes -- the copy
+  are reviewed together, and is uploaded to the SignPath project when it changes; the copy
   in this repository is for review, and the uploaded one is what takes effect.
 
   Schema: http://signpath.io/artifact-configuration/v1
