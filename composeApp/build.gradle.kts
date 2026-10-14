@@ -4,8 +4,10 @@ import gobley.gradle.cargo.dsl.android
 import gobley.gradle.cargo.dsl.jvm
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -168,6 +170,26 @@ cargo {
 //
 // The device this targets is a 64-bit ARM Android tablet; other ABIs would double the
 // Rust build time for binaries nobody runs, and are added when there is a reason.
+//
+// A release build has to be signed before Android will install it, and a release build is the
+// only one worth putting on a device to judge how the application behaves: Android refuses to
+// optimize a debuggable package, so a debug build is several times slower by construction and
+// says nothing about the application a user gets. The keystore is read from a
+// `keystore.properties` beside this repository's root that is not committed; without that file
+// the debug keystore is used, which installs and runs but is not an identity to release under.
+val signingProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+if (signingProperties.isEmpty && gradle.startParameter.taskNames.any { it.contains("Release") }) {
+    logger.warn(
+        "keystore.properties not found: the release build will be signed with the debug keystore",
+    )
+}
+val debugKeystore = File(System.getProperty("user.home"), ".android/debug.keystore")
+
 android {
     namespace = "dev.qualia.qualia2fa"
     // 35 rather than 36: the Kotlin plugin this build is pinned to (2.1.21) tops out at
@@ -195,6 +217,28 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = signingProperties.getProperty("storeFile")?.let { File(it) } ?: debugKeystore
+            storePassword = signingProperties.getProperty("storePassword") ?: "android"
+            keyAlias = signingProperties.getProperty("keyAlias") ?: "androiddebugkey"
+            keyPassword = signingProperties.getProperty("keyPassword") ?: "android"
+        }
+    }
+
+    buildTypes {
+        // Signed so that `assembleRelease` produces something that can be installed: the release
+        // variant exists here to be put on a device, because it is the only one whose performance
+        // means anything.
+        //
+        // R8 is left off. This application reaches its Rust library through JNA and through
+        // generated UniFFI bindings, neither of which has been exercised through a shrinking
+        // build, and the release build is fast enough without it.
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     packaging {

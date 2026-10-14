@@ -87,7 +87,17 @@ cd Qualia2FA
 ./gradlew :composeApp:jvmTest      # compile and run the unit tests, including round trips into the Rust library
 ./gradlew :composeApp:run          # start the desktop application
 ./gradlew :composeApp:packageMsi   # package it (jlink + jpackage)
+
+./gradlew :composeApp:assembleRelease  # Android package, signed and installable
+./gradlew :composeApp:assembleDebug    # Android debug package, for checking behaviour only
 ```
+
+To see what this application is like on a device, use `assembleRelease`: **Android refuses to
+optimize a debuggable package**, so a debug build is several times slower by construction and
+judging smoothness from one gives the opposite of what a user sees. `assembleRelease` needs a
+signature to be installable and reads it from a `keystore.properties` beside the repository root,
+which is not committed; without that file it falls back to the debug keystore, which is enough to
+install locally but is not an identity to release under.
 
 The application builds the **published** `qualia2fa-ffi`: during configuration the source is
 fetched from crates.io, checked against the SHA-256 the registry index publishes, and

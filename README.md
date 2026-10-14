@@ -72,7 +72,15 @@ cd Qualia2FA
 ./gradlew :composeApp:jvmTest      # 编译 + 跑单元测试（含打通 Rust 库的往返测试）
 ./gradlew :composeApp:run          # 起桌面应用
 ./gradlew :composeApp:packageMsi   # 打包（jlink + jpackage）
+
+./gradlew :composeApp:assembleRelease  # Android 安装包（签名、可直接安装）
+./gradlew :composeApp:assembleDebug    # Android 调试包，只用来验证功能
 ```
+
+要在设备上看这个应用是什么样，请用 `assembleRelease`：**Android 拒绝优化 debuggable 的
+包**，debug 构建因此天生慢好几倍，拿它判断流畅度会得出与用户所见相反的结论。
+`assembleRelease` 需要签名才能安装，签名信息从仓库根目录的 `keystore.properties`（不
+提交）读；没有那个文件时回退到 debug 密钥，够本地安装，但不是可以对外发布的身份。
 
 应用构建的是**已发布**的 `qualia2fa-ffi`：源码在配置阶段从 crates.io 取下来、按索引里的
 SHA-256 校验后解包进 git 忽略的 `composeApp/rust/`。换版本时**必须同时换掉

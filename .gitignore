@@ -6,6 +6,9 @@ build/
 # The SDK path is machine-specific, so it is not committed.
 local.properties
 
+# Where the release keystore is and what opens it, when there is a real one to sign with.
+keystore.properties
+
 # The Rust source is materialized from the published crate at build time.
 composeApp/rust/
 composeApp/target/
