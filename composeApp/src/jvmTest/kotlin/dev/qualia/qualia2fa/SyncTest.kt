@@ -21,7 +21,6 @@ import kotlin.test.assertTrue
  */
 class SyncTest {
     private val secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
-    private val now = 1_700_000_000L
 
     private fun deviceId(digit: Char): String = digit.toString().repeat(64)
 
@@ -43,9 +42,10 @@ class SyncTest {
         return vaultA to vaultB
     }
 
-    private fun addEntry(vault: Vault, name: String, updatedAt: Long = 1_700_000_000L): String =
+    /** The entry these tests move between devices, written at the instant they all start from. */
+    private fun addEntry(vault: Vault, updatedAt: Long = 1_700_000_000L): String =
         assertNotNull(
-            vault.addEntry(name, "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", updatedAt),
+            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", updatedAt),
             "adding an entry must succeed",
         )
 
@@ -63,7 +63,7 @@ class SyncTest {
     @Test
     fun twoDevicesCompleteASyncThroughTheFacade() {
         val (vaultA, vaultB) = twoVaultsOfOneAccount()
-        val id = addEntry(vaultA, "GitHub")
+        val id = addEntry(vaultA)
         val sessionA = assertNotNull(Qualia.syncSession(vaultA, deviceA))
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
 
@@ -94,7 +94,7 @@ class SyncTest {
     @Test
     fun aDeletionAgainstAnEditedEntryIsDecided() {
         val (vaultA, vaultB) = twoVaultsOfOneAccount()
-        val id = addEntry(vaultA, "GitHub")
+        val id = addEntry(vaultA)
         val sessionA = assertNotNull(Qualia.syncSession(vaultA, deviceA))
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
@@ -130,7 +130,7 @@ class SyncTest {
     @Test
     fun anEntryDeletedHereIsRestored() {
         val (vaultA, vaultB) = twoVaultsOfOneAccount()
-        val id = addEntry(vaultA, "GitHub")
+        val id = addEntry(vaultA)
         val sessionA = assertNotNull(Qualia.syncSession(vaultA, deviceA))
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
@@ -157,7 +157,7 @@ class SyncTest {
     @Test
     fun keepingTheLocalVersionLeavesTheEntryAlone() {
         val (vaultA, vaultB) = twoVaultsOfOneAccount()
-        val id = addEntry(vaultA, "GitHub")
+        val id = addEntry(vaultA)
         val sessionA = assertNotNull(Qualia.syncSession(vaultA, deviceA))
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))

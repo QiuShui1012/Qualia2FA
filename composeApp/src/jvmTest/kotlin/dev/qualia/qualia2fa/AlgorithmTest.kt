@@ -58,7 +58,7 @@ class AlgorithmTest {
 
             assertEquals(
                 expected,
-                codeFrom(secret.toByteArray(Charsets.US_ASCII), unixTime = 59, algorithm = algorithm, digits = 8, periodSeconds = 30),
+                codeFrom(secret.toByteArray(Charsets.US_ASCII), unixTime = 59, algorithm = algorithm, periodSeconds = 30),
                 "this test's own arithmetic, for $algorithm",
             )
 
@@ -165,7 +165,6 @@ class AlgorithmTest {
                 secret = base32Decode(link.secretBase32),
                 unixTime = 1_700_000_000,
                 algorithm = OtpAlgorithm.Sha256,
-                digits = 8,
                 periodSeconds = 60,
             ),
             vault.code(id, 1_700_000_000),
@@ -249,15 +248,16 @@ class AlgorithmTest {
 
     /**
      * An independent TOTP: RFC 4226 §5.3's truncation over RFC 6238 §4.2's counter, with the
-     * JDK's HMAC. [secret] is the raw key, already decoded.
+     * JDK's HMAC. [secret] is the raw key, already decoded. The code is cut to the eight
+     * digits RFC 6238 Appendix B publishes its vectors at.
      */
     private fun codeFrom(
         secret: ByteArray,
         unixTime: Long,
         algorithm: OtpAlgorithm,
-        digits: Int,
         periodSeconds: Long,
     ): String {
+        val digits = 8
         val counter = unixTime / periodSeconds
         val message = ByteArray(8) { index -> ((counter shr (8 * (7 - index))) and 0xFF).toByte() }
 
