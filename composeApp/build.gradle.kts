@@ -31,10 +31,22 @@ plugins {
 // the registry serves under that number. The crate is fetched once, checked against the
 // SHA-256 the registry index publishes for it, and unpacked into `rust/`, which git
 // ignores. Deleting `rust/` re-materializes it.
-val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.7")
-val ffiCrateSha256 = "71ce4cc8332efd659154f4c632203f1d730d97240d84ef028603bb7fb74c3e61"
-val rustSourceDir = layout.projectDirectory.dir("rust").asFile
+//
+// A development build can point at a local checkout instead, with
+// `-Pqualia2fa.ffi.localDir=<path to the FFI repository>`, relative to the repository root.
+// A change to the FFI cannot be built against the registry before it is released, and testing
+// it through a released version is not testing it at all. The registry stays the default,
+// checksum and all, so an ordinary build still builds exactly what crates.io serves under that
+// version number.
+val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.8")
+val ffiCrateSha256 = "37e7b6168bbb102d080ae7ed9aba86950a7af09922154605ae043ee487c5ab51"
+val ffiLocalDir = providers.gradleProperty("qualia2fa.ffi.localDir").orNull
+val rustSourceDir = ffiLocalDir?.let { rootProject.file(it) } ?: layout.projectDirectory.dir("rust").asFile
 val rustManifest = rustSourceDir.resolve("Cargo.toml")
+
+require(ffiLocalDir == null || rustManifest.isFile) {
+    "qualia2fa.ffi.localDir points at $rustSourceDir, which holds no Cargo.toml"
+}
 
 // The materialized copy is only reused when it is the version this build asks for;
 // otherwise a version bump would silently keep building the old crate.
@@ -46,7 +58,7 @@ val materializedVersion =
         null
     }
 
-if (materializedVersion != ffiCrateVersion) {
+if (ffiLocalDir == null && materializedVersion != ffiCrateVersion) {
     if (rustSourceDir.exists()) rustSourceDir.deleteRecursively()
     rustSourceDir.mkdirs()
     val crateFile = layout.buildDirectory.file("crates/qualia2fa-ffi-$ffiCrateVersion.crate").get().asFile
@@ -142,9 +154,10 @@ kotlin {
 }
 
 // The Rust source lives in `rust/`, materialized from the published `qualia2fa-ffi`
-// crate by the `materializeRustSource` task in the root build script.
+// crate by the `materializeRustSource` task in the root build script, or in the local
+// checkout named by `qualia2fa.ffi.localDir`.
 cargo {
-    packageDirectory = layout.projectDirectory.dir("rust")
+    packageDirectory = layout.dir(providers.provider { rustSourceDir })
 
     // Gobley defaults the JVM variant to Debug, which is the wrong default for an
     // application project: `subtle`'s debug assertions branch on secret data and the
