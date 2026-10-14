@@ -114,9 +114,16 @@ class VaultTest {
         assertTrue(image.width > 20, "the code must have real modules in it")
         assertEquals(image.width * image.height, image.pixels.size)
 
+        // A code drawn by this application carries the transport's envelope, so the text read back
+        // out of the pixels is the envelope and not what was drawn: unwrapping it is what gives
+        // back the text that went in.
+        val read = assertNotNull(
+            Qualia.qrTextFromImage(image.pixels, image.width, image.height),
+            "a code this application drew must be readable",
+        )
         assertEquals(
             text,
-            Qualia.qrTextFromImage(image.pixels, image.width, image.height),
+            Qualia.unwrapQrText(read),
             "the text must come back out of the pixels",
         )
 
