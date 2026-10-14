@@ -3,6 +3,9 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# The Kotlin compiler's project-local session directory.
+.kotlin/
+
 # The SDK path is machine-specific, so it is not committed.
 local.properties
 
