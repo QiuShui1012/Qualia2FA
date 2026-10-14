@@ -3,8 +3,11 @@
   The mark on the layer the launcher masks. Its intrinsic size is the 108dp the layer is, while
   its view port stays the mark's own 110 units, so the drawing is scaled into the layer rather
   than redrawn for it: the two cannot drift apart.
+
+  The monochrome layer is what a themed launcher tints, and it holds the line work alone.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>
