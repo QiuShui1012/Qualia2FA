@@ -54,6 +54,13 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   read back out of an image, and the text always stays underneath the code
 - **Syncing**: two devices show one code each, one direction at a time; wherever the two
   disagree, the user decides entry by entry
+- **On the same WiFi or hotspot**: pairing requests and sync payloads no longer have to be
+  carried by hand — the two devices find each other and the request and the reply travel over
+  the local network themselves. The QR code is still the pairing's **out-of-band anchor**: the
+  first pairing still takes one scan, which pins down which device the other side is, and the
+  LAN only saves the carrying afterwards. The LAN channel is **opened on demand**: a screen
+  that needs it opens one and closes it on the way out, nothing syncs in the background, and
+  nothing is announced while no screen is using it
 - **Settings**: the interface language, the protection the master key and the device
   identity actually have, recovery key import and export, and locking now
 - **Recovery keys**: export (the passphrase is typed twice) and import (replacing this
@@ -63,8 +70,7 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
   lock before a QR code could be picked out of an image
 
-Not there yet: LAN and hotspot syncing, multiple accounts, master key rotation, Android and
-iOS.
+Not there yet: multiple accounts, master key rotation, Android and iOS.
 
 ## Building and running
 
@@ -76,7 +82,7 @@ and published to crates.io; the app side depends on them by version:
 | `qualia-dik` | Device identity primitives (representation, fingerprint, verification) and the platform-native hardware keystores; the only crate allowed to use `unsafe` | LGPL-3.0-or-later |
 | `qualia2fa-core` | All cryptography, the vault format, the sync and pairing protocols. No I/O, no clock, no `unsafe` | LGPL-3.0-or-later |
 | `qualia2fa-ffi` | UniFFI bindings (Kotlin / Swift) plus the binding generator | LGPL-3.0-or-later |
-| `qualia-transport` | Transport channels: the QR half (capacity model, encoding, rendering, text envelope, image decoding) is implemented | LGPL-3.0-or-later |
+| `qualia-transport` | Transport channels: the QR half (capacity model, encoding, rendering, text envelope, image decoding) and the LAN half (multicast discovery, connection records, a QUIC data plane) are both implemented | LGPL-3.0-or-later |
 
 Building needs JDK 21 and a Rust toolchain (MSVC on Windows):
 

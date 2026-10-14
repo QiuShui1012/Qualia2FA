@@ -100,6 +100,9 @@
     <string name="dialog_open_recovery">Open a recovery key file</string>
     <string name="filter_recovery_files">Recovery key files</string>
 
+    <!-- The local network, which sync and pairing use when both devices share a WiFi -->
+    <string name="lan_permission_refused">The system did not allow the local network, so devices on this WiFi cannot be found.</string>
+
     <!-- Sync -->
     <string name="sync_intro">A sync code travels once in each direction: one device shows it, the other reads and merges what it carries. No server is involved — the codes themselves carry the data.</string>
     <string name="sync_error_no_device_identity">This device has no platform identity, so it cannot sync. It was created as a local-only vault, which cannot pair or sync.</string>
@@ -136,6 +139,24 @@
     <string name="action_restore_entry">Restore the entry</string>
     <string name="sync_error_decision_refused">The decision could not be applied, so nothing was changed.</string>
 
+    <!-- Syncing over the local network, from the sync screen -->
+    <string name="sync_lan_section">On the same WiFi</string>
+    <string name="sync_lan_explainer">Both devices have to be on the same network, and both have to be on this screen: nothing is looked for in the background, and this device announces itself only while this section is open.</string>
+    <string name="action_find_on_lan">Look for devices on this network</string>
+    <string name="sync_lan_unavailable">The local network could not be opened: no free UDP port, or the system refused it.</string>
+    <string name="sync_lan_looking">Looking for devices that are announcing themselves on this network…</string>
+    <string name="sync_lan_no_peers">Nothing has answered yet: the other device has to be on the same WiFi, and it has to have this section open as well.</string>
+    <string name="sync_lan_peer_left">left the network</string>
+    <string name="sync_lan_peer_unreachable">no address was seen for it, so it cannot be dialled</string>
+    <string name="sync_lan_selected">Selected: %1$s</string>
+    <string name="action_lan_send_state">Send this device's state to that one</string>
+    <string name="action_lan_receive_state">Take that device's state</string>
+    <string name="sync_lan_sent">This device's state was offered to %1$s; that device takes it from its own screen.</string>
+    <string name="sync_lan_send_failed">The state could not be sent to that device.</string>
+    <string name="sync_lan_nothing_received">Nothing arrived from that device. It has to send its state from its own screen, and both devices have to be on the same WiFi.</string>
+    <string name="sync_lan_waiting">Waiting for the other device's state, up to %1$d seconds…</string>
+    <string name="action_stop_lan">Stop looking</string>
+
     <!-- Pairing a new device, from the sync screen -->
     <string name="sync_pair_section">Add another device</string>
     <string name="sync_pair_explainer">The other device shows a request after reading the pairing code; the master key leaves this device only when you confirm.</string>
@@ -152,6 +173,17 @@
     <string name="pair_authorized_with_requester">Requester identity: %1$s. Hand the reply below to it to finish; nothing has been given to it before that.</string>
     <string name="pair_authorized">Authorized. Hand the reply below to the new device to finish.</string>
     <string name="action_copy_reply">Copy the reply</string>
+
+    <!-- Pairing over the local network, on the device that already has the account -->
+    <string name="pair_lan_section">On the same WiFi</string>
+    <string name="pair_lan_enable">Use the local network (same WiFi)</string>
+    <string name="pair_lan_explainer">With the local network on, the code below also names this device on the network: a new device on the same WiFi sends its request straight here instead of your carrying it.</string>
+    <string name="pair_lan_listening">Waiting for a request on this network, for up to two minutes; the code above works either way.</string>
+    <string name="pair_lan_window_over">No request arrived on the network in two minutes, so this device stopped listening. The code above still pairs by hand.</string>
+    <string name="pair_lan_unavailable">The local network could not be opened on this device.</string>
+    <string name="pair_lan_no_identity">This device has no platform identity, so it cannot be found on the network.</string>
+    <string name="pair_lan_request_from">The request came over the local network, from device %1$s.</string>
+    <string name="pair_lan_reply_sent">The reply was sent back over the local network.</string>
 
     <!-- Logging in on a new device -->
     <string name="join_intro">On a device that is already unlocked, choose “Pair a new device”, then paste the pairing code it shows below.</string>
@@ -171,6 +203,17 @@
     <string name="join_error_reply_rejected">The reply did not verify: it may not belong to this pairing, or the passphrase or the session does not match.</string>
     <string name="error_joined_but_not_serialized">Login succeeded, but the vault cannot be serialized.</string>
     <string name="action_complete_login">Finish the login</string>
+
+    <!-- Logging in over the local network, on the device that has no account yet -->
+    <string name="join_lan_section">On the same WiFi</string>
+    <string name="join_lan_explainer">The code you read names the other device on the network, so this device can send its request straight there and wait for the reply, with nothing carried by hand.</string>
+    <string name="action_lan_request">Send the request over the local network</string>
+    <string name="join_lan_looking">Looking for that device on this network…</string>
+    <string name="join_lan_unavailable">The local network could not be opened on this device.</string>
+    <string name="join_lan_no_device">That device was not found on this network. Both devices have to be on the same WiFi, and it has to be showing its pairing screen; the text route below always works.</string>
+    <string name="join_lan_waiting">Waiting for that device to confirm, up to %1$d seconds…</string>
+    <string name="join_lan_timed_out">That device did not answer over the network. Hand it the request text below and paste the reply back.</string>
+    <string name="join_lan_failed">The request could not be sent over the local network.</string>
 
     <!-- Settings -->
     <string name="settings_language">Language</string>

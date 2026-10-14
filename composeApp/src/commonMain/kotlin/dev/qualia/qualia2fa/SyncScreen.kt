@@ -6,32 +6,44 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_accept_deletion
+import dev.qualia.qualia2fa.resources.action_find_on_lan
 import dev.qualia.qualia2fa.resources.action_generate_code
 import dev.qualia.qualia2fa.resources.action_keep_deleted
 import dev.qualia.qualia2fa.resources.action_keep_entry
 import dev.qualia.qualia2fa.resources.action_keep_local
+import dev.qualia.qualia2fa.resources.action_lan_receive_state
+import dev.qualia.qualia2fa.resources.action_lan_send_state
 import dev.qualia.qualia2fa.resources.action_merge
 import dev.qualia.qualia2fa.resources.action_pair_new_device
 import dev.qualia.qualia2fa.resources.action_scan_code
 import dev.qualia.qualia2fa.resources.action_restore_entry
+import dev.qualia.qualia2fa.resources.action_stop_lan
 import dev.qualia.qualia2fa.resources.action_take_incoming
 import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.field_peer_code
+import dev.qualia.qualia2fa.resources.lan_permission_refused
 import dev.qualia.qualia2fa.resources.message_copied
 import dev.qualia.qualia2fa.resources.nav_sync
 import dev.qualia.qualia2fa.resources.sync_conflict_entry_mismatch
@@ -55,6 +67,18 @@ import dev.qualia.qualia2fa.resources.sync_error_nothing_to_read
 import dev.qualia.qualia2fa.resources.sync_error_other
 import dev.qualia.qualia2fa.resources.sync_error_sender_mismatch
 import dev.qualia.qualia2fa.resources.sync_intro
+import dev.qualia.qualia2fa.resources.sync_lan_explainer
+import dev.qualia.qualia2fa.resources.sync_lan_looking
+import dev.qualia.qualia2fa.resources.sync_lan_no_peers
+import dev.qualia.qualia2fa.resources.sync_lan_nothing_received
+import dev.qualia.qualia2fa.resources.sync_lan_peer_left
+import dev.qualia.qualia2fa.resources.sync_lan_peer_unreachable
+import dev.qualia.qualia2fa.resources.sync_lan_section
+import dev.qualia.qualia2fa.resources.sync_lan_selected
+import dev.qualia.qualia2fa.resources.sync_lan_send_failed
+import dev.qualia.qualia2fa.resources.sync_lan_sent
+import dev.qualia.qualia2fa.resources.sync_lan_unavailable
+import dev.qualia.qualia2fa.resources.sync_lan_waiting
 import dev.qualia.qualia2fa.resources.sync_my_code_explainer
 import dev.qualia.qualia2fa.resources.sync_pair_explainer
 import dev.qualia.qualia2fa.resources.sync_pair_section
@@ -62,6 +86,8 @@ import dev.qualia.qualia2fa.resources.sync_read_explainer
 import dev.qualia.qualia2fa.resources.sync_result_needs_decision
 import dev.qualia.qualia2fa.resources.sync_result_nothing_new
 import dev.qualia.qualia2fa.resources.sync_result_summary
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -81,6 +107,13 @@ import org.jetbrains.compose.resources.stringResource
  * [JoinAccountScreen], which is the joining side of a pairing rendered in this screen's
  * language; this composable is the tab, and a tab always comes with the surrounding
  * navigation.
+ *
+ * # The code route and the network route
+ *
+ * A code is carried by hand and always works. Two devices on one WiFi can also reach each
+ * other directly, which is the section that opens a [LanChannel]; it is opened by an explicit
+ * action and closed on the way out, because an open endpoint holds a port, a thread and a
+ * place in the network's announcements.
  */
 @Composable
 fun SyncScreen(
@@ -91,7 +124,7 @@ fun SyncScreen(
     var pairing by remember { mutableStateOf(false) }
 
     if (pairing) {
-        PairNewDeviceScreen(vault = vault, onDone = { pairing = false })
+        PairNewDeviceScreen(vault = vault, deviceId = deviceId, onDone = { pairing = false })
         return
     }
 
@@ -104,13 +137,30 @@ fun SyncScreen(
     val collector = remember { Qualia.frameCollector() }
     var message by remember { mutableStateOf<String?>(null) }
     var outcome by remember { mutableStateOf<SyncOutcome?>(null) }
-    var conflicts by remember { mutableStateOf<List<SyncConflict>>(emptyList()) }
+    var outcomeOverLan by remember { mutableStateOf(false) }
+    var conflicts by remember { mutableStateOf(PendingConflicts.none) }
+
+    var lanChannel by remember { mutableStateOf<LanChannel?>(null) }
+    var lanLobby by remember { mutableStateOf<LanLobby?>(null) }
+    var lanPeers by remember { mutableStateOf<List<LanPeer>>(emptyList()) }
+    var lanSelected by remember { mutableStateOf<String?>(null) }
+    var lanSentTo by remember { mutableStateOf<String?>(null) }
+    var lanReceiving by remember { mutableStateOf(false) }
+    val lanSession = remember(vault, lanChannel) { lanChannel?.let { Qualia.lanSyncSession(vault, it) } }
+
+    val multicast = rememberMulticastHold()
+    val permission = rememberLanPermission()
+    val scope = rememberCoroutineScope()
 
     val copied = stringResource(Res.string.message_copied)
     val unreadableImage = stringResource(Res.string.error_image_unreadable)
     val noCodeInImage = stringResource(Res.string.sync_error_no_code_in_image)
     val notSaved = stringResource(Res.string.sync_error_not_saved)
     val decisionRefused = stringResource(Res.string.sync_error_decision_refused)
+    val lanUnavailable = stringResource(Res.string.sync_lan_unavailable)
+    val lanRefused = stringResource(Res.string.lan_permission_refused)
+    val lanSendFailed = stringResource(Res.string.sync_lan_send_failed)
+    val lanNothingReceived = stringResource(Res.string.sync_lan_nothing_received)
     val scanner = LocalCodeScanner.current
 
     // Resolved here rather than where a refusal happens: a merge runs in a callback, and no
@@ -134,6 +184,40 @@ fun SyncScreen(
             MessageLine(stringResource(Res.string.sync_error_no_device_identity))
         }
         return
+    }
+
+    /** Opens an endpoint and its lobby, which is what looking for devices costs. */
+    fun openLan() {
+        val id = deviceId ?: return
+        val channel = Qualia.lanChannel(id)
+        if (channel == null) {
+            message = lanUnavailable
+            return
+        }
+        multicast.acquire()
+        val lobby = channel.openLobby()
+        if (lobby == null) {
+            multicast.release()
+            channel.close()
+            message = lanUnavailable
+            return
+        }
+        lanChannel = channel
+        lanLobby = lobby
+        lobby.announceNow()
+        message = null
+    }
+
+    /** Closes the endpoint and its lobby, and gives the multicast hold back. */
+    fun closeLan() {
+        lanLobby?.close()
+        lanChannel?.close()
+        multicast.release()
+        lanLobby = null
+        lanChannel = null
+        lanPeers = emptyList()
+        lanSelected = null
+        lanSentTo = null
     }
 
     /**
@@ -163,11 +247,73 @@ fun SyncScreen(
             is SyncMerge.Refused -> message = refusalTexts[result.reason]
             is SyncMerge.Merged -> {
                 outcome = result.outcome
-                conflicts = session.conflicts()
+                outcomeOverLan = false
+                conflicts = PendingConflicts(session.conflicts(), session::conflicts, session::decide)
                 message = null
                 peerCode = ""
                 onChanged()
             }
+        }
+    }
+
+    /**
+     * Sends this device's state to [peer], which has to be registered first.
+     *
+     * Registration is what gives the endpoint an address to dial: an announcement carries
+     * none, so a peer the lobby has heard but never seen a source for can be shown and not
+     * reached.
+     */
+    fun sendState(peer: LanPeer) {
+        val channel = lanChannel
+        val lan = lanSession
+        if (channel == null || lan == null || !channel.remember(peer)) {
+            message = lanSendFailed
+            return
+        }
+        if (lan.send(peer.deviceId)) {
+            lanSentTo = peer.deviceId
+            message = null
+        } else {
+            message = lanSendFailed
+        }
+    }
+
+    /** Takes the other device's state, which is the direction that changes this vault. */
+    fun receiveState() {
+        val lan = lanSession ?: return
+        scope.launch {
+            lanReceiving = true
+            val result = lan.receive(LAN_RECEIVE_TIMEOUT_MS)
+            lanReceiving = false
+            when (result) {
+                is SyncMerge.Refused ->
+                    message =
+                        if (result.reason == SyncRefusal.NothingToRead) {
+                            lanNothingReceived
+                        } else {
+                            refusalTexts[result.reason]
+                        }
+
+                is SyncMerge.Merged -> {
+                    outcome = result.outcome
+                    outcomeOverLan = true
+                    conflicts = PendingConflicts(lan.conflicts(), lan::conflicts, lan::decide)
+                    message = null
+                    onChanged()
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { closeLan() }
+    }
+
+    LaunchedEffect(lanLobby) {
+        val lobby = lanLobby ?: return@LaunchedEffect
+        while (true) {
+            lanPeers = lobby.peers()
+            delay(LAN_LIST_REFRESH_MS)
         }
     }
 
@@ -237,33 +383,79 @@ fun SyncScreen(
                 Text(stringResource(Res.string.action_merge))
             }
 
-            outcome?.let { result ->
-                MessageLine(
-                    if (result.madeNoChange) {
-                        stringResource(Res.string.sync_result_nothing_new)
-                    } else {
-                        stringResource(
-                            Res.string.sync_result_summary,
-                            result.added,
-                            result.tombstonesAdded,
-                            result.deletionsApplied,
-                            result.unchanged,
-                        )
-                    },
-                    isError = false,
-                )
+            if (!outcomeOverLan) {
+                outcome?.let { result -> MergeResult(result) }
             }
         }
 
-        if (conflicts.isNotEmpty()) {
+        SectionCard(title = stringResource(Res.string.sync_lan_section)) {
+            Hint(stringResource(Res.string.sync_lan_explainer))
+
+            if (lanChannel == null) {
+                Button(onClick = {
+                    permission.request { allowed -> if (allowed) openLan() else message = lanRefused }
+                }) {
+                    Text(stringResource(Res.string.action_find_on_lan))
+                }
+            } else {
+                if (lanPeers.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.size(Space.xl))
+                    Hint(stringResource(Res.string.sync_lan_looking))
+                    Hint(stringResource(Res.string.sync_lan_no_peers))
+                } else {
+                    lanPeers.forEach { peer ->
+                        LanPeerChoice(
+                            peer = peer,
+                            selected = peer.deviceId == lanSelected,
+                            onSelect = { lanSelected = peer.deviceId },
+                        )
+                    }
+                }
+
+                val selected = lanPeers.firstOrNull { it.deviceId == lanSelected }
+                if (selected != null) {
+                    Text(stringResource(Res.string.sync_lan_selected, shortDeviceId(selected.deviceId)))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.m)) {
+                        Button(
+                            onClick = { sendState(selected) },
+                            enabled = !lanReceiving && selected.socket != null,
+                        ) {
+                            Text(stringResource(Res.string.action_lan_send_state))
+                        }
+                        OutlinedButton(onClick = { receiveState() }, enabled = !lanReceiving) {
+                            Text(stringResource(Res.string.action_lan_receive_state))
+                        }
+                    }
+                }
+
+                if (lanReceiving) {
+                    CircularProgressIndicator(modifier = Modifier.size(Space.xl))
+                    Hint(stringResource(Res.string.sync_lan_waiting, LAN_RECEIVE_SECONDS))
+                }
+
+                if (outcomeOverLan) {
+                    outcome?.let { result -> MergeResult(result) }
+                }
+
+                lanSentTo?.let { device ->
+                    MessageLine(stringResource(Res.string.sync_lan_sent, shortDeviceId(device)), isError = false)
+                }
+
+                OutlinedButton(onClick = { closeLan() }, enabled = !lanReceiving) {
+                    Text(stringResource(Res.string.action_stop_lan))
+                }
+            }
+        }
+
+        if (conflicts.items.isNotEmpty()) {
             SectionCard(title = stringResource(Res.string.sync_conflict_heading)) {
-                MessageLine(stringResource(Res.string.sync_result_needs_decision, conflicts.size))
-                conflicts.forEach { conflict ->
+                MessageLine(stringResource(Res.string.sync_result_needs_decision, conflicts.items.size))
+                conflicts.items.forEach { conflict ->
                     ConflictCard(
                         conflict = conflict,
                         onDecide = { takeIncoming ->
-                            if (session.decide(conflict.entryId, takeIncoming)) {
-                                conflicts = session.conflicts()
+                            if (conflicts.decide(conflict.entryId, takeIncoming)) {
+                                conflicts = conflicts.settled()
                                 message = null
                                 onChanged()
                             } else {
@@ -283,6 +475,92 @@ fun SyncScreen(
         }
 
         MessageLine(message)
+    }
+}
+
+/**
+ * How long a receive waits for the other device's state.
+ *
+ * Both devices are at their screens for this, because that is the rule for every channel here;
+ * the wait is long enough to fetch the state from an unlocked device by hand and short enough
+ * that a device which is not coming leaves the screen usable.
+ */
+private const val LAN_RECEIVE_TIMEOUT_MS = 30_000L
+
+/** The same wait in whole seconds, which is what the interface counts in. */
+private val LAN_RECEIVE_SECONDS = (LAN_RECEIVE_TIMEOUT_MS / 1_000L).toInt()
+
+/** How often the list of devices on the network is read while the lobby is open. */
+private const val LAN_LIST_REFRESH_MS = 1_000L
+
+/**
+ * The disagreements waiting for a decision, and the session that reported them.
+ *
+ * The two travel together because a decision is applied through the session that received the
+ * payload: the library keeps each session's own pending list, so a decision sent through
+ * another session would change nothing. Which session that was — the code channel's or the
+ * network one — is not something the cards below have to know.
+ */
+private class PendingConflicts(
+    val items: List<SyncConflict>,
+    private val pending: () -> List<SyncConflict>,
+    /** Applies one decision, whose result the caller shows. */
+    val decide: (entryId: String, takeIncoming: Boolean) -> Boolean,
+) {
+    /** The same source, with the decisions applied so far. */
+    fun settled(): PendingConflicts = PendingConflicts(pending(), pending, decide)
+
+    companion object {
+        /** Nothing to decide, and a decision that says so. */
+        val none = PendingConflicts(emptyList(), { emptyList() }) { _, _ -> false }
+    }
+}
+
+/**
+ * What one merge changed, shown where it was asked for.
+ *
+ * A merge runs either over a code the user carried or over the network, and the two are
+ * separate sections of the screen: the summary belongs in the one the user acted on.
+ */
+@Composable
+private fun MergeResult(outcome: SyncOutcome) {
+    MessageLine(
+        if (outcome.madeNoChange) {
+            stringResource(Res.string.sync_result_nothing_new)
+        } else {
+            stringResource(
+                Res.string.sync_result_summary,
+                outcome.added,
+                outcome.tombstonesAdded,
+                outcome.deletionsApplied,
+                outcome.unchanged,
+            )
+        },
+        isError = false,
+    )
+}
+
+/**
+ * One device the lobby has heard, as one of the choices the user picks from.
+ *
+ * A device that said goodbye is listed too, and so is one whose announcement carried no
+ * address: "switched off" and "cannot be dialled" are different facts, and dropping either
+ * would make the device look like it had never been there.
+ */
+@Composable
+private fun LanPeerChoice(peer: LanPeer, selected: Boolean, onSelect: () -> Unit) {
+    val notes =
+        buildList {
+            if (!peer.here) add(stringResource(Res.string.sync_lan_peer_left))
+            if (peer.socket == null) add(stringResource(Res.string.sync_lan_peer_unreachable))
+        }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Column {
+            Text(shortDeviceId(peer.deviceId), style = MaterialTheme.typography.bodyMedium)
+            if (notes.isNotEmpty()) Hint(notes.joinToString(" · "))
+        }
     }
 }
 

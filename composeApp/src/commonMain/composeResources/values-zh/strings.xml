@@ -93,6 +93,9 @@
     <string name="dialog_open_recovery">打开恢复密钥文件</string>
     <string name="filter_recovery_files">恢复密钥文件</string>
 
+    <!-- 局域网：同步与配对在两台设备位于同一个 WiFi 时走的那条路 -->
+    <string name="lan_permission_refused">系统没有允许使用局域网，所以找不到这个 WiFi 上的设备。</string>
+
     <!-- 同步 -->
     <string name="sync_intro">同步用码在两个方向上各走一次：一台设备出示同步码，另一台读入并合并它带来的内容。全程不经过服务器，由二维码本身传递数据。</string>
     <string name="sync_error_no_device_identity">这台设备没有平台身份，无法同步。它当初是以「本机保险库」创建的，不能配对或同步。</string>
@@ -129,6 +132,24 @@
     <string name="action_restore_entry">恢复条目</string>
     <string name="sync_error_decision_refused">裁决没能生效，什么都没改动。</string>
 
+    <!-- 在局域网里同步（同步界面的一段） -->
+    <string name="sync_lan_section">同一 WiFi 局域网</string>
+    <string name="sync_lan_explainer">两台设备要在同一个网络里，而且都停在这个界面上：后台不做任何查找，本机也只在这一段打开期间对外公告自己。</string>
+    <string name="action_find_on_lan">在局域网里查找设备</string>
+    <string name="sync_lan_unavailable">打不开局域网通道：可能没有空闲的 UDP 端口，或者被系统拒绝了。</string>
+    <string name="sync_lan_looking">正在查找在这个网络里公告自己的设备……</string>
+    <string name="sync_lan_no_peers">还没有设备应答：对方也要在同一个 WiFi 上，并且也在它那边打开这一段。</string>
+    <string name="sync_lan_peer_left">已离开网络</string>
+    <string name="sync_lan_peer_unreachable">没有看到它的地址，无法拨号</string>
+    <string name="sync_lan_selected">已选中：%1$s</string>
+    <string name="action_lan_send_state">把我的状态发给它</string>
+    <string name="action_lan_receive_state">接收对方的状态</string>
+    <string name="sync_lan_sent">已把本机状态发给 %1$s；对方要在自己的界面上接收。</string>
+    <string name="sync_lan_send_failed">状态没能发到那台设备。</string>
+    <string name="sync_lan_nothing_received">对方什么都没有发来。它需要在自己的界面上发送状态，而且两台设备要在同一个 WiFi 上。</string>
+    <string name="sync_lan_waiting">正在等对方的状态，最多 %1$d 秒……</string>
+    <string name="action_stop_lan">停止查找</string>
+
     <!-- 配对新设备（在同步界面里） -->
     <string name="sync_pair_section">添加另一台设备</string>
     <string name="sync_pair_explainer">对方读过配对码之后会给你一段请求；只有在你确认之后，主密钥才会离开这台设备。</string>
@@ -145,6 +166,17 @@
     <string name="pair_authorized_with_requester">请求方身份：%1$s。把下面这段应答交给它即可完成；在交出去之前，什么都还没有给它。</string>
     <string name="pair_authorized">已授权。把下面这段应答交给新设备即可完成。</string>
     <string name="action_copy_reply">复制应答</string>
+
+    <!-- 在局域网里配对（已经持有账号的那一侧） -->
+    <string name="pair_lan_section">同一 WiFi 局域网</string>
+    <string name="pair_lan_enable">使用局域网（同一 WiFi）</string>
+    <string name="pair_lan_explainer">打开局域网后，下面的码里还会带上本机在网络上的位置：同一 WiFi 上的新设备会把请求直接发过来，不需要你手动搬运。</string>
+    <string name="pair_lan_listening">正在这个网络里等请求，最多两分钟；上面的码不受影响，怎样都能用。</string>
+    <string name="pair_lan_window_over">两分钟内网络上没有请求，本机已停止监听；上面的码仍然可以手动配对。</string>
+    <string name="pair_lan_unavailable">本机打不开局域网通道。</string>
+    <string name="pair_lan_no_identity">本机没有平台身份，无法在网络里被找到。</string>
+    <string name="pair_lan_request_from">请求来自局域网（设备 %1$s）。</string>
+    <string name="pair_lan_reply_sent">应答已通过局域网发回。</string>
 
     <!-- 在新设备上登录 -->
     <string name="join_intro">在一台已经解锁的设备上选择「配对新设备」，把那里显示的配对码贴到下面。</string>
@@ -164,6 +196,17 @@
     <string name="join_error_reply_rejected">应答没有通过验证：可能不是这次配对的应答，或者口令/会话对不上。</string>
     <string name="error_joined_but_not_serialized">加入成功，但保险库无法序列化。</string>
     <string name="action_complete_login">完成登录</string>
+
+    <!-- 在局域网里登录（还没有账号的那一侧） -->
+    <string name="join_lan_section">同一 WiFi 局域网</string>
+    <string name="join_lan_explainer">你读到的码里有对方在网络上的位置，本机可以把请求直接发过去并等它的应答，不需要手动搬运。</string>
+    <string name="action_lan_request">通过局域网发送请求</string>
+    <string name="join_lan_looking">正在这个网络里找那台设备……</string>
+    <string name="join_lan_unavailable">本机打不开局域网通道。</string>
+    <string name="join_lan_no_device">同一网络里没找到这台设备：两台设备要在同一个 WiFi 上，并且对方正停在配对界面上；下面的文本方式始终可用。</string>
+    <string name="join_lan_waiting">正在等对方确认，最多 %1$d 秒……</string>
+    <string name="join_lan_timed_out">对方没有在网络上应答。把下面的请求交给它，再把应答贴回来。</string>
+    <string name="join_lan_failed">请求没能通过局域网发出去。</string>
 
     <!-- 设置 -->
     <string name="settings_language">语言</string>

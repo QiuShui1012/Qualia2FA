@@ -10,6 +10,9 @@ import dev.qualia.qualia2fa.ffi.FfiEcLevel
 import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiJoiner
+import dev.qualia.qualia2fa.ffi.FfiLanChannel
+import dev.qualia.qualia2fa.ffi.FfiLanLobby
+import dev.qualia.qualia2fa.ffi.FfiLanPeer
 import dev.qualia.qualia2fa.ffi.FfiLogin
 import dev.qualia.qualia2fa.ffi.FfiPayloadKind
 import dev.qualia.qualia2fa.ffi.FfiPlatformKeys
@@ -33,6 +36,9 @@ import dev.qualia.qualia2fa.ffi.coreVersion as ffiCoreVersion
 import dev.qualia.qualia2fa.ffi.generateSecretBase32 as ffiGenerateSecretBase32
 import dev.qualia.qualia2fa.ffi.importRecoveryKey as ffiImportRecoveryKey
 import dev.qualia.qualia2fa.ffi.totpCode as ffiTotpCode
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * Where the master key is kept.
@@ -468,7 +474,12 @@ object Qualia {
      */
     fun joinPairing(qrText: String, label: String): PairingJoiner? =
         try {
-            PairingJoiner(FfiJoiner.fromQr(qrText, label), FfiPlatformKeys.open(label))
+            val code = parsePairingCode(qrText) ?: return null
+            PairingJoiner(
+                FfiJoiner.fromQr(code.payload, label),
+                FfiPlatformKeys.open(label),
+                code.record,
+            )
         } catch (_: Exception) {
             null
         }
@@ -645,6 +656,33 @@ private const val MAX_FRAMES: UInt = 64u
     fun syncSession(vault: Vault, deviceId: String): SyncSession? =
         try {
             SyncSession(vault.openSession(), CodeChannel(deviceId))
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Opens the LAN channel for [deviceId], bound to a port the system chooses.
+     *
+     * Returns `null` when the endpoint cannot be built, which in practice means no free port or
+     * a system policy that blocks UDP. Opening one does not touch the network: nothing is
+     * announced and nothing is dialled until the caller registers a peer or opens a lobby.
+     */
+    fun lanChannel(deviceId: String): LanChannel? =
+        try {
+            LanChannel(FfiLanChannel.open(deviceId), deviceId)
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Opens a synchronization session that runs over [channel] instead of over text.
+     *
+     * The vault is **mutated** by a merge and by every decision, so the caller has to serialize
+     * it afterward, exactly as with [syncSession].
+     */
+    fun lanSyncSession(vault: Vault, channel: LanChannel): LanSyncSession? =
+        try {
+            LanSyncSession(vault.openSession(), channel)
         } catch (_: Exception) {
             null
         }
@@ -857,6 +895,36 @@ private fun parseSyncCode(text: String): SyncCode? {
 /** Whether this character is one a hexadecimal identifier may contain. */
 private fun Char.isHexDigit(): Boolean = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
+/** The prefix of the text form of a pairing code that names where the host is. */
+private const val PAIRING_CODE_PREFIX = "Q2FAP2"
+
+/**
+ * The text that carries a pairing payload: `Q2FAP2:<base64 record>:<base32 payload>`.
+ *
+ * The record is the host's LAN half and is optional. Without one the text is the payload alone,
+ * which is what a device pairs with over the code channel; with one, a device on the same
+ * network can find the host by it — an announcement carries the same record for the device that
+ * sent it — and ask to join without anything being carried by hand.
+ */
+internal fun pairingCodeText(
+    record: ByteArray?,
+    payload: String,
+): String = if (record == null) payload else "$PAIRING_CODE_PREFIX:${encodeToText(record)}:$payload"
+
+/** A pairing code the user handed over: where the host is, and what to ask it. */
+internal class PairingCode(val record: ByteArray?, val payload: String)
+
+/** Reads a pairing code, in either the current form or the payload-only one. */
+internal fun parsePairingCode(text: String): PairingCode? {
+    val trimmed = text.trim()
+    if (!trimmed.startsWith("$PAIRING_CODE_PREFIX:")) return PairingCode(null, trimmed)
+
+    val parts = trimmed.split(':', limit = 3)
+    if (parts.size != 3 || parts[2].isEmpty()) return null
+    val record = decodeFromText(parts[1]) ?: return null
+    return PairingCode(record, parts[2])
+}
+
 /**
  * The code channel: an outbound queue and an inbound queue, with **no decisions** of its own.
  *
@@ -905,6 +973,261 @@ internal class CodeChannel(val deviceId: String) : FfiTransport {
     override fun receive(): FfiReceivedMessage? = incoming.removeFirstOrNull()
 
     override fun peers(): List<String> = listOfNotNull(peer)
+}
+
+/** How long [LanChannel.receive] and [LanSyncSession.receive] wait between attempts. */
+private const val RECEIVE_POLL_MS = 50L
+
+/**
+ * The LAN channel: one endpoint on this network segment, and the peers it may send to.
+ *
+ * Like [CodeChannel] this class only moves bytes; the difference is the carrier. Which payload
+ * goes first, what a merge does and what a disagreement means are all decided in the core.
+ *
+ * # Where a peer's address comes from
+ *
+ * An announcement carries a device identifier, an endpoint public key and a port, and **no
+ * address**: an endpoint reports its own sockets as the wildcard address, so the only party
+ * that knows where a datagram came from is the one that received it. The address therefore
+ * arrives with the announcement, in [LanPeer.socket], and a peer without one can be shown but
+ * not dialed.
+ *
+ * # It is opened on demand
+ *
+ * An open channel holds a UDP port and a runtime thread, and an open lobby announces this
+ * device into the network, so neither runs in the background: the interface opens them while a
+ * screen that needs them is up and closes them on the way out.
+ */
+class LanChannel internal constructor(
+    private val inner: FfiLanChannel,
+    /** This device's identifier, in the hexadecimal form the boundary uses. */
+    val deviceId: String,
+) {
+    /** The channel as a session takes it. The generated trait does not leave this file. */
+    internal val transport: FfiTransport get() = inner.transport()
+
+    /**
+     * This endpoint's connection record: what another device needs in order to dial it.
+     *
+     * The record carries the endpoint public key and the port, and no address. Returns `null`
+     * when it cannot be produced.
+     */
+    fun record(): ByteArray? =
+        try {
+            inner.record()
+        } catch (_: Exception) {
+            null
+        }
+
+    /** Registers [peer], which is what makes [sendTo] possible. */
+    fun remember(peer: LanPeer): Boolean {
+        val socket = peer.socket ?: return false
+        return try {
+            inner.rememberPeer(peer.deviceId, peer.record, socket)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Forgets a peer and closes the connection to it. */
+    fun forget(peerDeviceId: String): Boolean =
+        try {
+            inner.forgetPeer(peerDeviceId)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /** Sends one message to [peerDeviceId], which must have been registered first. */
+    fun sendTo(
+        peerDeviceId: String,
+        message: ByteArray,
+    ): Boolean =
+        try {
+            transport.send(FfiRecipient.One(peerDeviceId), message)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /** Takes one message if one is waiting, without waiting for one. */
+    fun receiveNow(): LanMessage? =
+        try {
+            transport.receive()?.let { LanMessage(it.sender, it.message) }
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Takes one message, waiting up to [timeoutMillis] for one to arrive.
+     *
+     * The library's own `receive` never blocks, because the core has no clock; how long to wait
+     * is decided here, where there is one. Nothing arriving in time returns `null`.
+     */
+    suspend fun receive(timeoutMillis: Long): LanMessage? {
+        val deadline = TimeSource.Monotonic.markNow() + timeoutMillis.milliseconds
+        while (true) {
+            receiveNow()?.let { return it }
+            if (deadline.hasPassedNow()) return null
+            delay(RECEIVE_POLL_MS)
+        }
+    }
+
+    /** Starts announcing this endpoint on the local network, and hearing the others. */
+    fun openLobby(): LanLobby? =
+        try {
+            LanLobby(inner.openLobby())
+        } catch (_: Exception) {
+            null
+        }
+
+    /** Closes the endpoint: every connection is closed and its runtime stops. */
+    fun close() {
+        runCatching { inner.shutdown() }
+    }
+}
+
+/**
+ * The lobby: which devices are announcing themselves on this network segment.
+ *
+ * Discovery only. Nothing it reports is authenticated, and no payload travels through it: what
+ * it answers is "who is probably here, and where to reach them". Whether a device really is
+ * what it claims is answered by the connection handshake and by the payload's own
+ * authentication.
+ */
+class LanLobby internal constructor(private val inner: FfiLanLobby) {
+    /**
+     * Every peer the lobby knows, whether or not it is still here.
+     *
+     * A peer that said goodbye or went quiet is reported too, with [LanPeer.here] false:
+     * "switched off" and "lost the network" look different to a user.
+     */
+    fun peers(): List<LanPeer> =
+        try {
+            inner.peers().map { LanPeer(it.deviceId, it.record, it.socket, it.here) }
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /**
+     * The peer whose record is [record].
+     *
+     * This is how a code says which device to dial: the code carries a record, and an
+     * announcement carries the same record for the device that sent it. Comparing the two is a
+     * lookup, not a decision.
+     */
+    fun peerWith(record: ByteArray): LanPeer? = peers().firstOrNull { it.record.contentEquals(record) }
+
+    /** Announces this device now instead of waiting for the interval. */
+    fun announceNow(): Boolean =
+        try {
+            inner.announceNow()
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /** Closes the lobby: one goodbye, then its thread and its socket. */
+    fun close() {
+        runCatching { inner.shutdown() }
+    }
+}
+
+/**
+ * One device the lobby has heard.
+ *
+ * [record] is what [LanChannel.remember] takes, and [socket] is the address the announcement
+ * arrived from.
+ */
+class LanPeer(
+    val deviceId: String,
+    val record: ByteArray,
+    val socket: String?,
+    val here: Boolean,
+)
+
+/** One message taken off a LAN channel. */
+class LanMessage(
+    /** The device the message claims to come from, hexadecimal. */
+    val sender: String,
+    /** The message bytes. */
+    val message: ByteArray,
+)
+
+/**
+ * One device's side of a synchronization that runs over the LAN instead of over text.
+ *
+ * The protocol is the one the code channel carries and the vault is mutated the same way: a
+ * merge writes into it and a decision writes into it, so the caller has to persist it
+ * ([Vault.serialize]) afterward.
+ *
+ * # The two sides act by hand
+ *
+ * Nothing is synchronized in the background: one side offers its state with [send], the other
+ * takes it with [receive], and the same pair of actions runs the other way for the reverse
+ * direction. Both sides are therefore at the screen at the same time, which is this
+ * application's rule for every channel.
+ */
+class LanSyncSession internal constructor(
+    private val inner: FfiSyncSession,
+    private val channel: LanChannel,
+) {
+    /** Offers this device's whole state to [peerDeviceId]. */
+    fun send(peerDeviceId: String): Boolean =
+        try {
+            inner.send(channel.transport, FfiRecipient.One(peerDeviceId), FfiPayloadKind.VAULT)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Takes the other device's state, waiting up to [timeoutMillis] for it to arrive.
+     *
+     * A wait that ends with nothing is [SyncMerge.Refused] with [SyncRefusal.NothingToRead],
+     * the same answer the code channel gives when no code has been read yet: from the user's
+     * side both mean there is nothing to merge.
+     */
+    suspend fun receive(timeoutMillis: Long): SyncMerge {
+        val deadline = TimeSource.Monotonic.markNow() + timeoutMillis.milliseconds
+        while (true) {
+            val refusal =
+                try {
+                    return SyncMerge.Merged(inner.receive(channel.transport).toOutcome())
+                } catch (error: FfiException) {
+                    refusalOf(error)
+                } catch (_: Exception) {
+                    SyncRefusal.Other
+                }
+            if (refusal != SyncRefusal.NothingToRead || deadline.hasPassedNow()) {
+                return SyncMerge.Refused(refusal)
+            }
+            delay(RECEIVE_POLL_MS)
+        }
+    }
+
+    /** The disagreements still waiting for a decision. */
+    fun conflicts(): List<SyncConflict> =
+        try {
+            inner.pendingConflicts().map { it.toConflict() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /**
+     * Applies one decision, which is what finally closes a disagreement.
+     *
+     * Returns false when the decision was refused, in which case the vault is unchanged and the
+     * conflict stays pending.
+     */
+    fun decide(entryId: String, takeIncoming: Boolean): Boolean =
+        try {
+            inner.adjudicate(entryId, if (takeIncoming) FfiDecision.TAKE_INCOMING else FfiDecision.KEEP_LOCAL)
+            true
+        } catch (_: Exception) {
+            false
+        }
 }
 
 /** Converts one outcome for the user interface. */
@@ -982,6 +1305,15 @@ class PairingHost internal constructor(private val inner: FfiLogin) {
     val payload: String get() = inner.payload()
 
     /**
+     * The text to put into the QR code, with this device's LAN record when it has one.
+     *
+     * With a record, a device on the same network finds this one by it and sends its request
+     * over the network instead of the user carrying it; without one the code still pairs over
+     * the code channel, which is what happens whenever the network is not shared.
+     */
+    fun codeText(record: ByteArray?): String = pairingCodeText(record, payload)
+
+    /**
      * The device identifier of the requester, available once its request arrived. Show it
      * to the user: comparing it out of band is what makes the confirmation mean something.
      */
@@ -1016,6 +1348,13 @@ class PairingHost internal constructor(private val inner: FfiLogin) {
 class PairingJoiner internal constructor(
     private val inner: FfiJoiner,
     private val keys: FfiPlatformKeys,
+    /**
+     * The host's LAN record, when the code carried one.
+     *
+     * It names which device to ask: the lobby reports the same record for the device that sent
+     * an announcement, so the two are matched rather than the device being guessed.
+     */
+    val hostRecord: ByteArray?,
 ) {
     /** The request to carry back to the host. */
     fun request(): ByteArray? =

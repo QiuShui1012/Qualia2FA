@@ -9,6 +9,35 @@
     <uses-permission android:name="android.permission.CAMERA" />
 
     <!--
+      The local network, which the sync and pairing screens use when both devices are on the
+      same WiFi. A channel is opened only while such a screen is showing and says so; nothing
+      is announced or listened for in the background.
+
+      INTERNET is what any socket needs, including the UDP one the endpoint is bound to.
+      ACCESS_NETWORK_STATE is what the transport reads to follow whether a network is up.
+      CHANGE_WIFI_MULTICAST_STATE is what a multicast lock is taken under, and without that
+      lock the chipset filters the discovery datagrams out before the system sees them.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!--
+      Asked for from Android 13, which is where the WiFi APIs started to require it. The
+      announcement carries a device identifier, an endpoint key and a port, and none of them
+      says where the device is, so the permission is declared never to be used for location.
+    -->
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!--
+      Asked for from Android 17, the version that gates every socket to the local network
+      behind a permission of its own.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!--
       Not required: the application works on a device without a camera, which is what the
       manifest asks the store to accept it on.
     -->

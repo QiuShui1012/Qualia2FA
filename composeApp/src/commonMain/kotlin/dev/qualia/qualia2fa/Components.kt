@@ -348,6 +348,20 @@ fun MessageLine(message: String?, isError: Boolean = true) {
 }
 
 /**
+ * The beginning of a device identifier, which is what tells two devices apart on screen.
+ *
+ * An identifier is sixty-four hexadecimal characters — the fingerprint of a device's identity
+ * key — and no screen has room for it, nor has a user any use for all of it: the first
+ * characters are what distinguish the two devices in front of them, and the whole value is
+ * shown where comparing it matters.
+ */
+fun shortDeviceId(deviceId: String): String =
+    if (deviceId.length <= SHORT_DEVICE_ID_CHARS) deviceId else deviceId.take(SHORT_DEVICE_ID_CHARS) + "…"
+
+/** How many characters of an identifier [shortDeviceId] keeps. */
+private const val SHORT_DEVICE_ID_CHARS = 8
+
+/**
  * The properties every dialog in this application is opened with.
  *
  * # Why a click outside does not close a dialog
