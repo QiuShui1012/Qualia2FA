@@ -85,23 +85,45 @@ jobs:
           yes | "$sdkmanager" --licenses > /dev/null
           "$sdkmanager" --install "ndk;28.2.13676358"
 
-      # `validateSigningRelease` runs before anything is signed and requires the keystore file
-      # to exist. A development machine has it because the debug variant has been built there;
-      # a runner has never built one. Creating it here is what the release fallback signs with
-      # -- the same key a local release build uses when the repository carries no
-      # `keystore.properties`, which is the case in CI.
+      # The key this release is signed with. Two cases, and the job says out loud which one it
+      # took:
       #
-      # It is the Android **debug** key: the APK installs and runs, and it is not an identity
-      # to publish under. The Release notes say so.
-      - name: Create the debug keystore the release fallback signs with
+      # - The repository has the four secrets below, so that **is** the release key.
+      # - It has none, so the build falls back to the Android debug key -- the same fallback a
+      #   local `assembleRelease` uses when there is no `keystore.properties`. `validateSigningRelease`
+      #   runs before anything is signed and needs the file to exist, and a runner has never
+      #   built the debug variant, so the file is created here.
+      #
+      # The secrets are optional on purpose: without them the workflow still produces an
+      # installable artifact, which is what a project with no signing key yet needs. Adding
+      # them is the whole of what turns that artifact into a signed release.
+      - name: Provide the signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          mkdir -p "$HOME/.android"
-          keytool -genkeypair \
-            -keystore "$HOME/.android/debug.keystore" \
-            -storepass android -keypass android \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            cat > keystore.properties <<PROPERTIES
+          storeFile=$RUNNER_TEMP/release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          PROPERTIES
+            echo "::notice::signing with the release key from the repository secrets"
+          else
+            mkdir -p "$HOME/.android"
+            keytool -genkeypair \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            echo "::warning::no release keystore secret is set, so the APK is signed with the Android debug key: it installs and runs, and it is not an identity to publish under."
+          fi
 
       - name: Cache the Rust registry
         uses: actions/cache@v4
@@ -180,8 +202,8 @@ jobs:
 
           | Platform | Artifact | Notes |
           |---|---|---|
-          | Android 8.0+ (64-bit ARM) | `Qualia2FA-<version>-arm64.apk` | signed with the debug keystore: it installs and runs, and it is not an identity to publish under |
-          | Windows 10/11 (x64) | `.msi` installer, `.exe` installer | not code-signed, so SmartScreen warns on first run |
+          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the key the build was given; a debug-key signature installs and runs and is not an identity to publish under |
+          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | not code-signed, so SmartScreen warns on first run |
 
           Nothing is synchronized in the background. The local-network half of pairing and
           syncing is opened while a screen that needs it is up, and the first pairing still
@@ -265,8 +287,8 @@ jobs:
 
           | Platform | Artifact | Notes |
           |---|---|---|
-          | Android 8.0+ (64-bit ARM) | `Qualia2FA-<version>-arm64.apk` | signed with the debug keystore: it installs and runs, and it is not an identity to publish under |
-          | Windows 10/11 (x64) | `.msi` installer, `.exe` installer | not code-signed, so SmartScreen warns on first run |
+          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the key the build was given; a debug-key signature installs and runs and is not an identity to publish under |
+          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | not code-signed, so SmartScreen warns on first run |
 
           Nothing is synchronized in the background. The local-network half of pairing and
           syncing is opened while a screen that needs it is up, and the first pairing still
@@ -277,14 +299,26 @@ jobs:
             --notes-file notes.md \
             --verify-tag || true
 
+      # The tag carries the `v` the artifacts are named with, while jpackage names its output
+      # after the numeric `packageVersion` (an MSI version cannot carry a prefix). Renaming here
+      # keeps one naming scheme across the platforms: `Qualia2FA-v0.0.2.msi`, and so on.
+      - name: Name the installers after the tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp composeApp/build/compose/binaries/main/msi/*.msi "dist/Qualia2FA-${GITHUB_REF_NAME}.msi"
+          cp composeApp/build/compose/binaries/main/exe/*.exe "dist/Qualia2FA-${GITHUB_REF_NAME}.exe"
+          ls -l dist
+
       - name: Upload the installers
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release upload "$GITHUB_REF_NAME" \
-               composeApp/build/compose/binaries/main/msi/*.msi \
-               composeApp/build/compose/binaries/main/exe/*.exe \
+               dist/*.msi \
+               dist/*.exe \
                --clobber; then
             echo "Uploaded the installers to $GITHUB_REF_NAME"
           else

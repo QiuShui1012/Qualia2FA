@@ -10,7 +10,11 @@ build/
 local.properties
 
 # Where the release keystore is and what opens it, when there is a real one to sign with.
+# The key itself is never committed, and the patterns are here for the case where it is kept
+# beside the repository rather than somewhere only the build knows about.
 keystore.properties
+*.jks
+*.keystore
 
 # The Rust source is materialized from the published crate at build time.
 composeApp/rust/
