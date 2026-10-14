@@ -2,67 +2,40 @@
 <!--
   SignPath artifact configuration for the Qualia2FA release artifacts.
 
-  It describes the structure of what is submitted for signing, not how it is signed: the
-  certificate, the signing policy and the approval rules live in the SignPath project. This
-  file is versioned here so that a change to the artifacts and a change to what is signed
-  are reviewed together, and is uploaded to the SignPath project when it changes; the copy
-  in this repository is for review, and the uploaded one is what takes effect.
+  It describes what is submitted for signing, not how it is signed: certificate,
+  policy and approval live in the SignPath project. The copy here is for review;
+  the uploaded one is what takes effect.
 
   Schema: http://signpath.io/artifact-configuration/v1
 
-  # What arrives, and why a zip
+  What arrives: the release job zips the tag's two installers, so a `<zip-file>`
+  root carries both in one request. The version is a wildcard because
+  user-defined parameters are not enabled for this project; what pins the version
+  is the job, which builds the zip from the tag it is releasing.
 
-  The release job produces two installers for one tag, and a SignPath signing request
-  carries one artifact. A `<zip-file>` root is the documented way to sign several files in
-  one request: the job zips `Qualia2FA-v<version>.msi` and `Qualia2FA-v<version>.exe` into
-  `bundle.zip` and submits that.
+  What is signed, and only this:
 
-  # Why a wildcard instead of a parameter
+  - the Inno Setup installer (`Qualia2FA-v<version>.exe`), a Portable Executable;
+  - the MSI package, and the launcher inside it, whose path comes from an
+    artifact sample of a real installer: `Qualia2FA\Qualia2FA.exe`. The launcher
+    is what runs after installation, so it is the signature a user's machine
+    sees when the application starts.
 
-  A `${version}` parameter would be the tighter description, and it is not available here:
-  user-defined parameters are refused for this project. The version is therefore a
-  wildcard, and what keeps the request honest moves to the job, which builds the zip from
-  the artifacts of the tag it is releasing and checks their names against that tag before
-  submitting.
+  What is deliberately not signed: everything the sample generator listed under
+  `Qualia2FA\runtime` and `Qualia2FA\app`. Those are the bundled JDK runtime
+  (`jvm.dll`, `awt.dll`, the `api-ms-win-*` shims) and third-party libraries
+  (`skiko-windows-x64.dll`, `jnidispatch.dll`, and the jars of Kotlin, Compose,
+  coroutines, jna and skiko). They belong to their vendors, and a signature is a
+  claim about who produced a file; `<jar-sign/>` would additionally rewrite jars
+  this project did not build. A generated configuration that lists them is a
+  description of what is present, not a decision about what to sign.
 
-  A wildcard's default `max-matches` is 1, so a zip holding two MSIs or two EXEs is rejected
-  rather than signed twice: the wildcard leaves the version open, not the count. Paths are
-  case-insensitive, and `*` does not cross a directory separator.
-
-  # What is signed
-
-  - The MSI installer itself: `<msi-file>` with a trailing `<authenticode-sign/>` signs the
-    package. This is the signature Windows shows in the install dialog and the one that
-    decides whether SmartScreen warns.
-  - The EXE installer: jpackage builds it with Inno Setup, and the result is a Portable
-    Executable, so `<pe-file>` is its element. Its payload is compressed, which is why the
-    application inside cannot be signed through this file.
-
-  # Current state
-
-  Deep signing of the launcher inside the MSI is deliberately **not** enabled. A jpackage
-  MSI lays its files out in a directory named after the package, and signing them requires
-  the exact paths, which are read from an artifact sample rather than guessed: an element
-  that matches nothing is accepted silently, and a configuration that quietly signs less
-  than it claims is worse than one that signs less and says so. Add the paths here once a
-  sample has been uploaded, and the launcher inside the installer gets a signature too.
-
-  The PE metadata carries no version fields for the same reason it carries no parameter:
-  `product-version` and `file-version` cannot be templated without one, and a literal would
-  mean editing this file for every release, which is how a version silently goes stale. The
-  product name, the company and the copyright are constants and are set here, because
-  jpackage writes no product name into the installer's own version resource at all.
-
-  Signing the Rust library or the bundled runtime image is deliberately not planned: the
-  runtime comes from the JDK, and putting this project's signature on a third-party binary
-  would claim it as this project's own.
+  Current state: deep signing is limited to the one file above, and no element
+  here matches a file that may be absent, because an element that matches
+  nothing is accepted silently.
 -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <zip-file>
-    <msi-file path="Qualia2FA-v*.msi">
-      <authenticode-sign />
-    </msi-file>
-
     <pe-file
       path="Qualia2FA-v*.exe"
       product-name="Qualia2FA"
@@ -70,5 +43,12 @@
       copyright="Copyright (c) Qualia2FA contributors">
       <authenticode-sign />
     </pe-file>
+
+    <msi-file path="Qualia2FA-v*.msi">
+      <pe-file path="Qualia2FA\Qualia2FA.exe">
+        <authenticode-sign />
+      </pe-file>
+      <authenticode-sign />
+    </msi-file>
   </zip-file>
 </artifact-configuration>
