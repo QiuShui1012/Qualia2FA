@@ -99,8 +99,10 @@ fun PairNewDeviceScreen(
                 scanner.readCode(
                     unreadable = unreadableImage,
                     noCode = noRequest,
-                    onText = {
-                        requestText = it
+                    onText = { scanned ->
+                        // The code carries this application's envelope; what belongs in the
+                        // field is what was put into it.
+                        requestText = Qualia.unwrapQrText(scanned) ?: scanned
                         message = requestRead
                     },
                     onMessage = { message = it },

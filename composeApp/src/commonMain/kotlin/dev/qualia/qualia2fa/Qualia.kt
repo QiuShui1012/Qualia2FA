@@ -7,6 +7,7 @@ import dev.qualia.qualia2fa.ffi.FfiDecision
 import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
 import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiEcLevel
+import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiJoiner
 import dev.qualia.qualia2fa.ffi.FfiLogin
@@ -21,8 +22,10 @@ import dev.qualia.qualia2fa.ffi.FfiSyncSession
 import dev.qualia.qualia2fa.ffi.FfiTransport
 import dev.qualia.qualia2fa.ffi.FfiTransportCapabilities
 import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
-import dev.qualia.qualia2fa.ffi.qrDecode as ffiQrDecode
 import dev.qualia.qualia2fa.ffi.qrDecodeText as ffiQrDecodeText
+import dev.qualia.qualia2fa.ffi.qrEncodeFrames as ffiQrEncodeFrames
+import dev.qualia.qualia2fa.ffi.qrFrameCapacity as ffiQrFrameCapacity
+import dev.qualia.qualia2fa.ffi.qrUnwrapText as ffiQrUnwrapText
 import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
 import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
@@ -522,19 +525,61 @@ object Qualia {
      */
     fun qrTextFromImage(pixels: ByteArray, width: Int, height: Int): String? =
         try {
-            // A code of this application is tried first, because its text comes back unwrapped:
-            // pairing and sync codes are carried inside an envelope, and the screens that read
-            // them expect what was put in. Any other code — a server's `otpauth://` link, which
-            // is what importing an entry starts from — is not this application's, and the
-            // payload reader refuses it by design. That refusal is not a failure to read the
-            // image, so the text reader gets the second attempt.
-            ffiQrDecode(pixels, width.toUInt(), height.toUInt())
+            // The text of whichever code is in the picture, exactly as the code carries it. A
+            // screen that wants the content of this application's own code unwraps it with
+            // [unwrapQrText], and one that collects a split payload hands the text to a
+            // [QrFrameCollector] — which is the only thing that knows how many codes there are.
+            ffiQrDecodeText(pixels, width.toUInt(), height.toUInt())
         } catch (_: Exception) {
-            try {
-                ffiQrDecodeText(pixels, width.toUInt(), height.toUInt())
-            } catch (_: Exception) {
-                null
-            }
+            null
+        }
+
+    /**
+     * Takes the envelope off a code this facade drew, or `null` when the text is something else.
+     *
+     * A code that is one of several is not unwrapped here: it carries part of the payload, and
+     * what to do with it is [QrFrameCollector]'s business.
+     */
+    fun unwrapQrText(text: String): String? =
+        try {
+            ffiQrUnwrapText(text)
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * Draws a payload as the codes to show one after another.
+     *
+     * A payload that fits in one code comes back as a sequence of one, so the caller does not
+     * have to decide which way to draw it: `count` says what the sequence is.
+     */
+    fun qrFrames(text: String, scale: Int = 4, quietZone: Int = 4): QrFrames? =
+        try {
+            val frames =
+                ffiQrEncodeFrames(
+                    text,
+                    FfiEcLevel.MEDIUM,
+                    QR_MAX_VERSION,
+                    MAX_FRAMES,
+                    scale.toUShort(),
+                    quietZone.toUShort(),
+                )
+            QrFrames(frames.map { QrImage(it.image.width.toInt(), it.image.height.toInt(), it.image.pixels) })
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * A collector for the codes of a split payload, or `null` when one cannot be made.
+     *
+     * It is built for the profile [qrFrames] draws with, so the two agree on what one code
+     * holds without either side passing the number around.
+     */
+    fun frameCollector(): QrFrameCollector? =
+        try {
+            QrFrameCollector(FfiFrameCollector(ffiQrFrameCapacity(FfiEcLevel.MEDIUM, QR_MAX_VERSION)))
+        } catch (_: Exception) {
+            null
         }
 
     /**
@@ -544,6 +589,14 @@ object Qualia {
      * refused rather than drawn at a size no camera will read.
      */
     private const val QR_MAX_VERSION: UByte = 20u
+
+/**
+ * The most codes one payload may be split into.
+ *
+ * Every code has to be held in front of a camera in turn, so this is a limit on the user's
+ * patience rather than on the format, which allows far more.
+ */
+private const val MAX_FRAMES: UInt = 64u
 
     /**
      * This device's identity fingerprint: 64 hexadecimal characters, or `null` when the
@@ -1067,3 +1120,79 @@ data class Registration(
     val backend: String,
     val hardwareBacked: Boolean,
 )
+
+/**
+ * A code that may need more than one image.
+ *
+ * A payload that fits in one code comes back as a sequence of one, so a screen never has to
+ * decide which way to draw it: [count] says what the sequence is.
+ */
+class QrFrames internal constructor(private val images: List<QrImage>) {
+    /** How many codes the payload was split into. */
+    val count: Int get() = images.size
+
+    /** The image of the code at [index], counting from zero. */
+    fun image(index: Int): QrImage = images[index]
+}
+
+/** Where one code sits in the sequence it belongs to. */
+data class FrameCount(val index: Int, val count: Int)
+
+/** What one read code did to a [QrFrameCollector]. */
+sealed interface FrameStep {
+    /** The code's number in its sequence, counting from one. */
+    val index: Int
+
+    /** How many codes the sequence has. */
+    val count: Int
+
+    /** The code was taken, and the set is not complete yet. */
+    class Taken(override val index: Int, override val count: Int) : FrameStep
+
+    /** The code completed the set. */
+    class Completed(
+        override val index: Int,
+        override val count: Int,
+        val payload: ByteArray,
+    ) : FrameStep
+
+    /** The code is not one of this application's frames. */
+    data object Rejected : FrameStep {
+        override val index: Int = 0
+        override val count: Int = 0
+    }
+}
+
+/**
+ * Collects the codes of a payload that was split, in any order and with repeats.
+ *
+ * The caller reads one code at a time and hands each text to [push]. Codes may arrive twice,
+ * out of order, or both, which is what collecting them by camera looks like; [received] and
+ * [missing] are what a screen shows while it waits.
+ */
+class QrFrameCollector internal constructor(private val inner: FfiFrameCollector) {
+    /** How many codes have been accepted so far. */
+    val received: Int get() = inner.received().toInt()
+
+    /** How many codes the set has, once one of them has said so. */
+    val expected: Int? get() = inner.expected()?.toInt()
+
+    /** The numbers of the codes still missing, once the count is known. */
+    val missing: List<Int> get() = inner.missing().map { it.toInt() }
+
+    /** Takes one read code, saying what it did to the set. */
+    fun push(text: String): FrameStep =
+        try {
+            val step = inner.push(text)
+            val index = step.index.toInt()
+            val count = step.count.toInt()
+            val payload = step.payload
+            if (payload == null) {
+                FrameStep.Taken(index, count)
+            } else {
+                FrameStep.Completed(index, count, payload)
+            }
+        } catch (_: Exception) {
+            FrameStep.Rejected
+        }
+}

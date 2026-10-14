@@ -94,7 +94,7 @@
     <string name="filter_recovery_files">恢复密钥文件</string>
 
     <!-- 同步 -->
-    <string name="sync_intro">同步用码在两个方向上各走一次：一台设备出示同步码，另一台读入并合并它带来的内容。全程不经过任何服务器，走动的只有那些码。</string>
+    <string name="sync_intro">同步用码在两个方向上各走一次：一台设备出示同步码，另一台读入并合并它带来的内容。全程不经过服务器，由二维码本身传递数据。</string>
     <string name="sync_error_no_device_identity">这台设备没有平台身份，无法同步。它当初是以「本机保险库」创建的，不能配对或同步。</string>
     <string name="sync_my_code_explainer">把这个码交给另一台设备。合并之后请重新生成一次：交出去的是生成那一刻的状态。</string>
     <string name="action_generate_code">生成同步码</string>
@@ -216,4 +216,13 @@
     <string name="dialog_delete_entry_text">删除会同步到这个账号的所有设备：那边这个条目也会消失，它产生过的验证码找不回来。</string>
     <string name="field_secret_replace">新种子</string>
     <string name="hint_secret_kept">留空则不改动</string>
+
+    <!-- A code that needs several images -->
+    <string name="sync_frames_explainer">这个码一个二维码装不下，会依次显示多张：让另一台设备逐张扫描。</string>
+    <string name="sync_frames_counter">第 %1$d/%2$d 个</string>
+    <string name="sync_frames_progress">已收 %1$d/%2$d。</string>
+    <string name="sync_frames_received">已收 %1$d 个。</string>
+    <string name="scan_keep_going">已收到，继续扫剩下的。</string>
+    <string name="scan_frame_taken">第 %1$d/%2$d 帧</string>
+    <string name="sync_frames_count">%1$d/%2$d</string>
 </resources>

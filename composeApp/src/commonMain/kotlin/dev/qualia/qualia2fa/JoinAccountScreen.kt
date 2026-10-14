@@ -100,8 +100,10 @@ fun JoinAccountScreen(
                 scanner.readCode(
                     unreadable = unreadableImage,
                     noCode = noPairingCode,
-                    onText = {
-                        payload = it
+                    onText = { scanned ->
+                        // The code carries this application's envelope; what belongs in the
+                        // field is what was put into it.
+                        payload = Qualia.unwrapQrText(scanned) ?: scanned
                         message = pairingCodeRead
                     },
                     onMessage = { message = it },
@@ -144,8 +146,8 @@ fun JoinAccountScreen(
                     scanner.readCode(
                         unreadable = unreadableImage,
                         noCode = noReply,
-                        onText = {
-                            replyText = it
+                        onText = { scanned ->
+                            replyText = Qualia.unwrapQrText(scanned) ?: scanned
                             message = replyRead
                         },
                         onMessage = { message = it },

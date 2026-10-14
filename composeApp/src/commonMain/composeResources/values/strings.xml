@@ -101,7 +101,7 @@
     <string name="filter_recovery_files">Recovery key files</string>
 
     <!-- Sync -->
-    <string name="sync_intro">Syncing moves codes in both directions: one device shows a code, the other reads it and merges what it carries. Nothing goes through a server, and the codes are the only thing that travels.</string>
+    <string name="sync_intro">A sync code travels once in each direction: one device shows it, the other reads and merges what it carries. No server is involved — the codes themselves carry the data.</string>
     <string name="sync_error_no_device_identity">This device has no platform identity, so it cannot sync. It was created as a local-only vault, which cannot pair or sync.</string>
     <string name="sync_my_code_explainer">Hand this code to the other device. After a merge, generate it again: what you hand over is the state at the moment it was generated.</string>
     <string name="action_generate_code">Generate the code</string>
@@ -223,4 +223,13 @@
     <string name="dialog_delete_entry_text">The deletion reaches every device this account is on: the entry disappears there as well, and the codes it produced cannot be recovered.</string>
     <string name="field_secret_replace">New secret</string>
     <string name="hint_secret_kept">Leave it blank to keep the current secret</string>
+
+    <!-- A code that needs several images -->
+    <string name="sync_frames_explainer">This code does not fit in one QR code, so several are shown in turn: read each of them with the other device.</string>
+    <string name="sync_frames_counter">%1$d of %2$d</string>
+    <string name="sync_frames_progress">Collected %1$d of %2$d.</string>
+    <string name="sync_frames_received">Collected %1$d.</string>
+    <string name="scan_keep_going">Got it — keep scanning the rest.</string>
+    <string name="scan_frame_taken">Frame %1$d of %2$d</string>
+    <string name="sync_frames_count">%1$d/%2$d</string>
 </resources>

@@ -38,6 +38,7 @@ import dev.qualia.qualia2fa.resources.error_camera_failed
 import dev.qualia.qualia2fa.resources.error_camera_refused
 import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.icon_image
+import dev.qualia.qualia2fa.resources.scan_frame_taken
 import dev.qualia.qualia2fa.resources.scan_hint
 import dev.qualia.qualia2fa.resources.scan_title
 import org.jetbrains.compose.resources.painterResource
@@ -55,6 +56,16 @@ class ScanRequest(
     val noCode: String,
     val onText: (String) -> Unit,
     val onMessage: (String?) -> Unit,
+    /**
+     * Takes a code that is one of several, answering with where it sits in the sequence.
+     *
+     * A payload that needs several codes is collected by reading one after another, and closing
+     * the camera between them would make the user reopen it for every image. Answering keeps
+     * the scanner where it is, and the counts it answers with are what the scanner tells the
+     * user it just read. The default closes the scanner after one code, which is what a screen
+     * that wants a whole code needs.
+     */
+    val onFrame: (String) -> FrameCount? = { null },
 )
 
 /**
@@ -85,7 +96,8 @@ fun CodeScanner.readCode(
     noCode: String,
     onText: (String) -> Unit,
     onMessage: (String?) -> Unit,
-) = read(ScanRequest(unreadable, noCode, onText, onMessage))
+    onFrame: (String) -> FrameCount? = { null },
+) = read(ScanRequest(unreadable, noCode, onText, onMessage, onFrame))
 
 /** What the camera is doing, so that the scanner can say why there is no picture. */
 enum class CameraStatus {
@@ -194,14 +206,20 @@ fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) 
     // for exactly as long as the scanner is open, which is when the user is looking for it.
     // The message is therefore kept here as well and shown beside the hint.
     var notice by remember { mutableStateOf<String?>(null) }
+    var takenFrame by remember { mutableStateOf<FrameCount?>(null) }
 
     val dialogTitle = stringResource(Res.string.dialog_pick_image)
     val imageFilesLabel = stringResource(Res.string.filter_image_files)
     val pickLabel = stringResource(Res.string.cd_pick_image)
 
     val answer: (String) -> Unit = { text ->
-        onDismiss()
-        request.onText(text)
+        val frame = request.onFrame(text)
+        if (frame == null) {
+            onDismiss()
+            request.onText(text)
+        } else {
+            takenFrame = frame
+        }
     }
 
     // The scanner is drawn over the screen that asked for it rather than in place of it, so
@@ -265,11 +283,13 @@ fun ScanScreen(request: ScanRequest, picker: FilePicker, onDismiss: () -> Unit) 
                 CameraStatus.Refused -> MessageLine(stringResource(Res.string.error_camera_refused))
                 CameraStatus.Failed -> MessageLine(stringResource(Res.string.error_camera_failed))
                 CameraStatus.Starting, CameraStatus.Running -> {
+                    val frame = takenFrame
                     val current = notice
-                    if (current != null) {
-                        MessageLine(current)
-                    } else {
-                        Hint(stringResource(Res.string.scan_hint))
+                    when {
+                        frame != null ->
+                            MessageLine(stringResource(Res.string.scan_frame_taken, frame.index, frame.count))
+                        current != null -> MessageLine(current)
+                        else -> Hint(stringResource(Res.string.scan_hint))
                     }
                 }
             }

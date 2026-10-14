@@ -27,6 +27,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -47,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_copy
+import dev.qualia.qualia2fa.resources.sync_frames_counter
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -159,6 +162,48 @@ fun CodeBlock(code: String, onCopied: () -> Unit) {
         }
     }
 }
+
+/**
+ * A code that needs several images, shown one after another.
+ *
+ * The counter is not decoration: a user holding a camera at the screen has to know how far
+ * along the sequence is and that it starts over, or a code that cycles looks like one that
+ * flickers — and the image they missed is the one that matters.
+ */
+@Composable
+fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    var shown by remember(frames) { mutableStateOf(0) }
+
+    LaunchedEffect(frames) {
+        while (true) {
+            delay(FRAME_MILLIS)
+            shown = (shown + 1) % frames.count
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
+        QrCodeView(frames.image(shown))
+        Text(stringResource(Res.string.sync_frames_counter, shown + 1, frames.count))
+        Text(code, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+        TextButton(onClick = {
+            clipboard.setText(AnnotatedString(code))
+            onCopied()
+        }) {
+            Text(stringResource(Res.string.action_copy))
+        }
+    }
+}
+
+/**
+ * How long each image of a sequence is shown before the next one.
+ *
+ * Long enough for a camera to find and read it, twice over: the frame caught while the screen
+ * is still changing reads as nothing, and the one behind it needs the time that follows. A
+ * code replaced before that has happened is a code the reader never sees, and the user is left
+ * holding the device at a screen that cycles faster than it can be read.
+ */
+private const val FRAME_MILLIS = 2400L
 
 /** A step's short instruction. */
 @Composable

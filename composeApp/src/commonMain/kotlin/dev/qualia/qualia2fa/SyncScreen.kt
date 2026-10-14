@@ -2,6 +2,7 @@ package dev.qualia.qualia2fa
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_accept_deletion
@@ -41,6 +43,8 @@ import dev.qualia.qualia2fa.resources.sync_conflict_local_is_newer
 import dev.qualia.qualia2fa.resources.sync_conflict_peer_deleted
 import dev.qualia.qualia2fa.resources.sync_conflict_side_deleted
 import dev.qualia.qualia2fa.resources.sync_conflict_side_incoming
+import dev.qualia.qualia2fa.resources.sync_frames_explainer
+import dev.qualia.qualia2fa.resources.sync_frames_count
 import dev.qualia.qualia2fa.resources.sync_conflict_side_local
 import dev.qualia.qualia2fa.resources.sync_error_already_applied
 import dev.qualia.qualia2fa.resources.sync_error_authentication_failed
@@ -97,6 +101,9 @@ fun SyncScreen(
 
     var myCode by remember { mutableStateOf<String?>(null) }
     var peerCode by remember { mutableStateOf("") }
+    var collected by remember { mutableStateOf<Pair<Int, Int?>?>(null) }
+    var completedPayload by remember { mutableStateOf<String?>(null) }
+    val collector = remember { Qualia.frameCollector() }
     var message by remember { mutableStateOf<String?>(null) }
     var outcome by remember { mutableStateOf<SyncOutcome?>(null) }
     var conflicts by remember { mutableStateOf<List<SyncConflict>>(emptyList()) }
@@ -132,6 +139,27 @@ fun SyncScreen(
         return
     }
 
+    /**
+     * What one read code does.
+     *
+     * A payload that fits in one code is unwrapped and put in the field, which is where the
+     * user sees what they are about to merge. A code that is one of several is handed to the
+     * collector instead: it carries part of the payload, and the field is for whole codes.
+     */
+    fun collect(scanned: String): FrameCount? =
+        when (val step = collector?.push(scanned)) {
+            is FrameStep.Completed -> {
+                completedPayload = step.payload.decodeToString()
+                collected = collector?.let { it.received to it.expected }
+                null
+            }
+            is FrameStep.Taken -> {
+                collected = collector?.let { it.received to it.expected }
+                FrameCount(step.index, step.count)
+            }
+            else -> null
+        }
+
     /** Merges what is in the field, and keeps whatever the merge left to decide. */
     fun merge(text: String) {
         when (val result = session.mergeText(text)) {
@@ -166,7 +194,15 @@ fun SyncScreen(
             }) {
                 Text(stringResource(Res.string.action_generate_code))
             }
-            myCode?.let { code -> CodeBlock(code = code, onCopied = { message = copied }) }
+            myCode?.let { code ->
+                val frames = remember(code) { Qualia.qrFrames(code) }
+                if (frames != null && frames.count > 1) {
+                    Hint(stringResource(Res.string.sync_frames_explainer))
+                    FramedCode(frames = frames, code = code, onCopied = { message = copied })
+                } else {
+                    CodeBlock(code = code, onCopied = { message = copied })
+                }
+            }
         }
 
         SectionCard(title = stringResource(Res.string.action_merge)) {
@@ -177,22 +213,34 @@ fun SyncScreen(
                 label = { Text(stringResource(Res.string.field_peer_code)) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.m),
+            ) {
             OutlinedButton(onClick = {
                 scanner.readCode(
                     unreadable = unreadableImage,
                     noCode = noCodeInImage,
-                    onText = {
-                        peerCode = it
-                        message = codeRead
+                    onFrame = { collect(it) },
+                    onText = { scanned ->
+                        val payload = completedPayload
+                        completedPayload = null
+                        merge(payload ?: Qualia.unwrapQrText(scanned) ?: scanned)
                     },
                     onMessage = { message = it },
                 )
             }) {
                 Text(stringResource(Res.string.action_scan_code))
             }
+            collected?.let { (received, expected) ->
+                Text(stringResource(Res.string.sync_frames_count, received, expected ?: received))
+            }
+            }
             Button(onClick = { merge(peerCode.trim()) }, enabled = peerCode.isNotBlank()) {
                 Text(stringResource(Res.string.action_merge))
             }
+
+
 
             outcome?.let { result ->
                 MessageLine(
