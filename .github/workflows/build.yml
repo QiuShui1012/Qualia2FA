@@ -100,3 +100,90 @@ jobs:
           # A build that produced no installer is a failure, not an empty artifact.
           if-no-files-found: error
           retention-days: 90
+
+  # The Android target is a separate platform, not a flavor of the desktop one, so it is a
+  # separate job rather than a matrix over the job above: it cross-compiles the Rust library
+  # for the device, links it with the NDK, and produces an APK instead of an installer.
+  #
+  # # What it proves, and what it does not
+  #
+  # It proves that the tree builds for the device from a clean checkout, which is the part
+  # that cannot be checked on the desktop: `ring`, `iroh` and the rest of the LAN data plane
+  # have to compile and link for `aarch64-linux-android`, and the NDK version has to be the
+  # one the build asks for. It does not prove that the APK runs -- that is the manual pass on
+  # a real device.
+  #
+  # The **debug** variant is deliberate here: a build check needs the code to compile and
+  # link, not the release optimization pass, which costs several minutes of runner time for
+  # nothing this job asserts. A debug build says nothing about how the application behaves;
+  # only a release build does, and that one is what the release workflow produces.
+  android:
+    name: Android arm64 (build + APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      # The checked-out file mode is whatever the repository records, and this repository
+      # is developed on Windows, where the bit is not part of a commit. Making the wrapper
+      # executable here is cheaper than a build that fails on a permission error.
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+
+      # The build sets `jvmToolchain(21)`, and the runner's default JDK is 17.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # The device target only: the APK carries one Rust library, for `arm64-v8a`.
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      # The NDK is what compiles the Rust library's C dependencies (`ring` above all) and
+      # what links the cdylib for the device. It has to be the version `ndkVersion` names in
+      # `composeApp/build.gradle.kts`: the runner ships a different one, and a mismatch fails
+      # at link time, long after configuration, with an error that points at the linker.
+      - name: Install the Android NDK
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" --install "ndk;28.2.13676358"
+
+      # Only the cargo home is cached, not the build tree: the Rust source is materialized
+      # into `composeApp/rust/` at configuration time from the published crate, and the build
+      # script deletes that directory whenever the version it finds there is not the version
+      # it was asked for. A restored `target/` would therefore be discarded before it could
+      # be used. The registry -- dependency sources, which every compile needs -- is what is
+      # worth keeping.
+      - name: Cache the Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          # A key of its own rather than the desktop job's: the two jobs can run at the same
+          # time, and a cache written by one is not what the other needs.
+          key: ${{ runner.os }}-cargo-android-${{ hashFiles('composeApp/build.gradle.kts') }}
+          restore-keys: ${{ runner.os }}-cargo-android-
+
+      - name: Build the debug APK
+        run: ./gradlew :composeApp:assembleDebug
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qualia2FA-android-arm64-debug
+          path: composeApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 90
+

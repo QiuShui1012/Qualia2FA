@@ -1,0 +1,133 @@
+name: Release
+
+# Releases only on `v*` tags.
+#
+# Deliberately **not** on pushes to master: a Release is a public statement about a commit,
+# and it should be made on purpose rather than as a side effect of merging.
+#
+# The tag carries the application version, and the first job checks that the two agree
+# before anything is built: a Release whose tag says one thing while the APK inside says
+# another is worse than no Release, because the version is what a user reports in a bug.
+on:
+  push:
+    tags:
+      - 'v*'
+  # Manual runs only verify the tag against the version; they never create a Release.
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify the tag matches the application version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the tag with versionName
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(grep -oP 'versionName = "\K[^"]+' composeApp/build.gradle.kts)
+          echo "tag=$tag versionName=$version"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match versionName $version in composeApp/build.gradle.kts"
+            exit 1
+          fi
+
+  android:
+    name: Android arm64 (release APK)
+    needs: verify
+    # A manual trigger only runs verification: nothing is released without a tag.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # `GITHUB_TOKEN` is read-only by default, and the last step creates a Release. The
+    # minimum permission is declared explicitly: writing repository contents, and nothing
+    # else.
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install the Android NDK
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" --install "ndk;28.2.13676358"
+
+      - name: Cache the Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-android-release-${{ hashFiles('composeApp/build.gradle.kts') }}
+          restore-keys: ${{ runner.os }}-cargo-android-
+
+      # A release build is the only one worth shipping: Android refuses to optimize a
+      # debuggable package, so a debug APK would be several times slower by construction and
+      # would say nothing about the application a user gets.
+      #
+      # Signing: this step uses `keystore.properties` when the repository has one beside its
+      # root, and the debug keystore otherwise -- which is the case in CI, because the file
+      # is not committed. The APK that comes out installs and runs, and it is **not** signed
+      # with an identity to release under; a build meant for distribution has to be made
+      # where that file exists.
+      - name: Build the release APK
+        run: ./gradlew :composeApp:assembleRelease
+
+      - name: Name the APK after the tag
+        run: |
+          set -euo pipefail
+          cp composeApp/build/outputs/apk/release/composeApp-release.apk \
+             "Qualia2FA-${GITHUB_REF_NAME}-arm64.apk"
+
+      - name: Create the GitHub Release
+        # # This step deliberately omits `set -e`
+        #
+        # The build has already succeeded and its artifact has been uploaded by the time a
+        # Release can fail to be created (a missing permission, an existing Release). Turning
+        # the whole job red would read as a failed build, which it is not.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Android 8.0 or newer, 64-bit ARM only (`arm64-v8a`).
+
+          The APK is signed with the debug keystore, because this repository does not carry
+          the release key: it installs and runs, and it is not an identity to publish under.
+
+          Nothing is synchronized in the background. The local-network half of pairing and
+          syncing is opened while a screen that needs it is up, and the first pairing still
+          reads a QR code, which is what pins the two devices to each other.
+          NOTES
+          if gh release create "$GITHUB_REF_NAME" \
+               --title "Qualia2FA $GITHUB_REF_NAME" \
+               --notes-file notes.md \
+               --verify-tag \
+               "Qualia2FA-${GITHUB_REF_NAME}-arm64.apk"; then
+            echo "Created GitHub Release $GITHUB_REF_NAME"
+          else
+            echo "::warning::the APK was built, but creating the GitHub Release failed (usually a missing contents: write permission, or a Release that already exists)."
+          fi
