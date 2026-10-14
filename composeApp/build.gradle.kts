@@ -221,8 +221,8 @@ android {
         // encoding of a sync code: both are API 26.
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = 2
+        versionName = "0.0.2"
 
         ndk.abiFilters += setOf("arm64-v8a")
     }
@@ -284,7 +284,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qualia2FA"
-            packageVersion = "0.0.1"
+            packageVersion = "0.0.2"
             description = "Serverless, non-realtime two-factor authentication"
             vendor = "Qualia2FA"
 
