@@ -178,7 +178,7 @@ fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
 
     LaunchedEffect(frames) {
         while (true) {
-            delay(FRAME_MILLIS)
+            delay(FRAME_INTERVAL)
             shown = (shown + 1) % frames.count
         }
     }
@@ -204,7 +204,45 @@ fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
  * before that has happened is a code the reader never sees, and the user is left holding the
  * device at a screen that cycles faster than it can be read.
  */
-private const val FRAME_MILLIS = 1200L
+private val FRAME_INTERVAL = 1200.milliseconds
+
+/**
+ * A code on its way in: the field it is pasted into, and the way to read one out of an image.
+ *
+ * The three screens that take a code ask for the same two controls in the same order, and what
+ * each of them does with the text differs, so the callbacks come from the screen. So do the two
+ * failures of the scanner: they are worded for what the screen was looking for.
+ */
+@Composable
+fun CodeField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    scanLabel: String,
+    unreadable: String,
+    noCode: String,
+    onScanned: (String) -> Unit,
+    onMessage: (String?) -> Unit,
+) {
+    val scanner = LocalCodeScanner.current
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedButton(onClick = {
+        scanner.readCode(
+            unreadable = unreadable,
+            noCode = noCode,
+            onText = onScanned,
+            onMessage = onMessage,
+        )
+    }) {
+        Text(scanLabel)
+    }
+}
 
 /** A step's short instruction. */
 @Composable

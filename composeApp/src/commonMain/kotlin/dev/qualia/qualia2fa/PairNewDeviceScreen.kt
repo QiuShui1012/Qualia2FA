@@ -3,13 +3,11 @@ package dev.qualia.qualia2fa
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,15 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_authorize_device
-import dev.qualia.qualia2fa.resources.action_copy_pairing_code
 import dev.qualia.qualia2fa.resources.action_done
 import dev.qualia.qualia2fa.resources.action_pair_new_device
 import dev.qualia.qualia2fa.resources.action_scan_request
-import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_image_has_no_request
 import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.field_joiner_request
-import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.message_copied
 import dev.qualia.qualia2fa.resources.message_request_read
 import dev.qualia.qualia2fa.resources.pair_authorized
@@ -61,7 +56,6 @@ fun PairNewDeviceScreen(
     val noRequest = stringResource(Res.string.error_image_has_no_request)
     val requestRead = stringResource(Res.string.message_request_read)
     val requestRejected = stringResource(Res.string.pair_error_request_rejected)
-    val scanner = LocalCodeScanner.current
 
     if (host == null) {
         Column(
@@ -89,27 +83,21 @@ fun PairNewDeviceScreen(
         }
 
         SectionCard(title = stringResource(Res.string.field_joiner_request)) {
-            OutlinedTextField(
+            CodeField(
                 value = requestText,
                 onValueChange = { requestText = it },
-                label = { Text(stringResource(Res.string.field_joiner_request)) },
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(Res.string.field_joiner_request),
+                scanLabel = stringResource(Res.string.action_scan_request),
+                unreadable = unreadableImage,
+                noCode = noRequest,
+                onScanned = { scanned ->
+                    // The code carries this application's envelope; what belongs in the
+                    // field is what was put into it.
+                    requestText = Qualia.unwrapQrText(scanned) ?: scanned
+                    message = requestRead
+                },
+                onMessage = { message = it },
             )
-            OutlinedButton(onClick = {
-                scanner.readCode(
-                    unreadable = unreadableImage,
-                    noCode = noRequest,
-                    onText = { scanned ->
-                        // The code carries this application's envelope; what belongs in the
-                        // field is what was put into it.
-                        requestText = Qualia.unwrapQrText(scanned) ?: scanned
-                        message = requestRead
-                    },
-                    onMessage = { message = it },
-                )
-            }) {
-                Text(stringResource(Res.string.action_scan_request))
-            }
             Button(
                 onClick = {
                     val reply = host.replyTo(requestText.trim(), vault)

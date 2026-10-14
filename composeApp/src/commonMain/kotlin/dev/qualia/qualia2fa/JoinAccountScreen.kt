@@ -3,13 +3,10 @@ package dev.qualia.qualia2fa
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,19 +18,16 @@ import androidx.compose.ui.Modifier
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_back
 import dev.qualia.qualia2fa.resources.action_complete_login
-import dev.qualia.qualia2fa.resources.action_copy_request
 import dev.qualia.qualia2fa.resources.action_generate_request
 import dev.qualia.qualia2fa.resources.action_join_existing_account
 import dev.qualia.qualia2fa.resources.action_scan_pairing_code
 import dev.qualia.qualia2fa.resources.action_scan_reply
-import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_image_has_no_pairing_code
 import dev.qualia.qualia2fa.resources.error_image_has_no_reply
 import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.error_joined_but_not_serialized
 import dev.qualia.qualia2fa.resources.field_pairing_code
 import dev.qualia.qualia2fa.resources.field_reply
-import dev.qualia.qualia2fa.resources.filter_image_files
 import dev.qualia.qualia2fa.resources.join_error_bad_code
 import dev.qualia.qualia2fa.resources.join_error_reply_rejected
 import dev.qualia.qualia2fa.resources.join_error_request_failed
@@ -78,7 +72,6 @@ fun JoinAccountScreen(
     val requestFailed = stringResource(Res.string.join_error_request_failed)
     val replyRejected = stringResource(Res.string.join_error_reply_rejected)
     val notSerialized = stringResource(Res.string.error_joined_but_not_serialized)
-    val scanner = LocalCodeScanner.current
 
     Column(
         modifier = Modifier.fillMaxSize().padding(Space.l).verticalScroll(rememberScrollState()),
@@ -90,27 +83,21 @@ fun JoinAccountScreen(
         Hint(stringResource(Res.string.join_intro))
 
         SectionCard(title = stringResource(Res.string.field_pairing_code)) {
-            OutlinedTextField(
+            CodeField(
                 value = payload,
                 onValueChange = { payload = it },
-                label = { Text(stringResource(Res.string.field_pairing_code)) },
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(Res.string.field_pairing_code),
+                scanLabel = stringResource(Res.string.action_scan_pairing_code),
+                unreadable = unreadableImage,
+                noCode = noPairingCode,
+                onScanned = { scanned ->
+                    // The code carries this application's envelope; what belongs in the
+                    // field is what was put into it.
+                    payload = Qualia.unwrapQrText(scanned) ?: scanned
+                    message = pairingCodeRead
+                },
+                onMessage = { message = it },
             )
-            OutlinedButton(onClick = {
-                scanner.readCode(
-                    unreadable = unreadableImage,
-                    noCode = noPairingCode,
-                    onText = { scanned ->
-                        // The code carries this application's envelope; what belongs in the
-                        // field is what was put into it.
-                        payload = Qualia.unwrapQrText(scanned) ?: scanned
-                        message = pairingCodeRead
-                    },
-                    onMessage = { message = it },
-                )
-            }) {
-                Text(stringResource(Res.string.action_scan_pairing_code))
-            }
             Button(
                 onClick = {
                     val started = Qualia.joinPairing(payload.trim(), DEVICE_LABEL)
@@ -136,25 +123,19 @@ fun JoinAccountScreen(
         requestText?.let { request ->
             SectionCard(title = stringResource(Res.string.join_hand_back_request)) {
                 CodeBlock(code = request, onCopied = { message = copied })
-                OutlinedTextField(
+                CodeField(
                     value = replyText,
                     onValueChange = { replyText = it },
-                    label = { Text(stringResource(Res.string.field_reply)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(Res.string.field_reply),
+                    scanLabel = stringResource(Res.string.action_scan_reply),
+                    unreadable = unreadableImage,
+                    noCode = noReply,
+                    onScanned = { scanned ->
+                        replyText = Qualia.unwrapQrText(scanned) ?: scanned
+                        message = replyRead
+                    },
+                    onMessage = { message = it },
                 )
-                OutlinedButton(onClick = {
-                    scanner.readCode(
-                        unreadable = unreadableImage,
-                        noCode = noReply,
-                        onText = { scanned ->
-                            replyText = Qualia.unwrapQrText(scanned) ?: scanned
-                            message = replyRead
-                        },
-                        onMessage = { message = it },
-                    )
-                }) {
-                    Text(stringResource(Res.string.action_scan_reply))
-                }
                 Button(
                     onClick = {
                         val current = joiner
