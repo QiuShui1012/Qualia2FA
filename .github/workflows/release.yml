@@ -85,6 +85,24 @@ jobs:
           yes | "$sdkmanager" --licenses > /dev/null
           "$sdkmanager" --install "ndk;28.2.13676358"
 
+      # `validateSigningRelease` runs before anything is signed and requires the keystore file
+      # to exist. A development machine has it because the debug variant has been built there;
+      # a runner has never built one. Creating it here is what the release fallback signs with
+      # -- the same key a local release build uses when the repository carries no
+      # `keystore.properties`, which is the case in CI.
+      #
+      # It is the Android **debug** key: the APK installs and runs, and it is not an identity
+      # to publish under. The Release notes say so.
+      - name: Create the debug keystore the release fallback signs with
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Cache the Rust registry
         uses: actions/cache@v4
         with:
