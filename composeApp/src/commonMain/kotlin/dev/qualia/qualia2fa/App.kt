@@ -201,7 +201,7 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
 
     LaunchedEffect(phase) {
         if (phase !is Phase.Main) return@LaunchedEffect
-        delay(SESSION_TIMEOUT_SECONDS * 1_000L)
+        delay(SESSION_TIMEOUT_SECONDS.seconds)
         lock(Status.LockedAfterTimeout(SESSION_TIMEOUT_SECONDS))
     }
 

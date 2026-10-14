@@ -97,6 +97,8 @@ import dev.qualia.qualia2fa.resources.message_entry_imported
 import dev.qualia.qualia2fa.resources.nav_two_factor
 import dev.qualia.qualia2fa.resources.selection_count
 import dev.qualia.qualia2fa.resources.two_factor_empty
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -200,13 +202,13 @@ fun TwoFactorScreen(
             // Until the second changes, not for a second: a fixed delay from the last wake drifts,
             // and a countdown that drifts holds one number for longer than a second and then skips
             // the next one.
-            delay(1000 - millis % 1000)
+            delay((1000 - millis % 1000).milliseconds)
         }
     }
 
     LaunchedEffect(copied) {
         val value = copied ?: return@LaunchedEffect
-        delay(30_000)
+        delay(30.seconds)
         if (clipboard.getText()?.text == value) {
             clipboard.setText(AnnotatedString(""))
         }
