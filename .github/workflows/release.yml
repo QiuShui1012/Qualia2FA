@@ -95,6 +95,24 @@ jobs:
           key: ${{ runner.os }}-cargo-android-release-${{ hashFiles('composeApp/build.gradle.kts') }}
           restore-keys: ${{ runner.os }}-cargo-android-
 
+      # A release build compiles the whole Rust dependency tree -- iroh, tokio and their
+      # several hundred crates -- once per profile, and the trees measured on a development
+      # machine are 8.4 GB for the unpacked source plus 4.5 GB for the device target alone.
+      # A runner arrives with the Android SDK, several language toolchains and container
+      # images already installed, which is where its free space went. Removing what this job
+      # does not use is cheaper than a build that dies with "No space left on device" twenty
+      # minutes in.
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          df -h /
+          # Deliberately **not** `$AGENT_TOOLSDIRECTORY`: the JDK and the Rust toolchain were
+          # set up above and live there.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/system-images \
+                      /opt/ghc /usr/local/share/boost || true
+          sudo apt-get clean
+          df -h /
+
       # A release build is the only one worth shipping: Android refuses to optimize a
       # debuggable package, so a debug APK would be several times slower by construction and
       # would say nothing about the application a user gets.
@@ -103,8 +121,20 @@ jobs:
       # root, and the debug keystore otherwise -- which is the case in CI, because that file
       # is not committed. The APK still installs and runs; it is **not** signed with an
       # identity to release under, and the Release notes say so.
+      #
+      # A failure prints its own last lines as `::error::` annotations: reading a run's log
+      # needs the API (rate-limited) or a download, while annotations are on the run page.
       - name: Build the release APK
-        run: ./gradlew :composeApp:assembleRelease
+        run: |
+          set +e
+          ./gradlew :composeApp:assembleRelease --stacktrace 2>&1 | tee gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::error::the release APK build failed; the last lines of the run follow"
+            tail -n 40 gradle.log | while IFS= read -r line; do echo "::error::$line"; done
+            df -h /
+          fi
+          exit "$status"
 
       - name: Name the APK after the tag
         run: |

@@ -81,8 +81,20 @@ jobs:
 
       # The tests include the round trip into the Rust library, so they fail if the
       # embedded binary is not the one the build pinned.
+      #
+      # A failure prints its own last lines as `::error::` annotations. The log of a run is
+      # only reachable through the API (which is rate-limited) or by downloading an archive,
+      # while annotations are on the run page itself -- and a test failure is exactly the kind
+      # of thing someone reads from a phone.
       - name: Run the unit tests
-        run: .\gradlew.bat :composeApp:jvmTest
+        shell: pwsh
+        run: |
+          .\gradlew.bat :composeApp:jvmTest --stacktrace 2>&1 | Tee-Object -FilePath test.log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::the unit tests failed; the last lines of the run follow"
+            Get-Content test.log -Tail 30 | ForEach-Object { Write-Host "::error::$_" }
+            exit 1
+          }
 
       # MSI needs the WiX toolset and EXE needs Inno Setup; both are installed on the
       # runner. jlink builds the runtime image and jpackage the installers, so nothing
