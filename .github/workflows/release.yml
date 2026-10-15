@@ -343,6 +343,10 @@ jobs:
           SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
         run: |
           $ErrorActionPreference = 'Stop'
+          # The gallery needs its NuGet provider before it can install anything, and asking for
+          # it interactively is how this step fails on a runner: there is nobody to answer the
+          # prompt. Installing it up front, and trusting the gallery, keeps the step silent.
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.1.201 -Force -Scope CurrentUser | Out-Null
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction SilentlyContinue
           Install-Module -Name SignPath -Scope CurrentUser -Force -AllowClobber
           Import-Module SignPath
