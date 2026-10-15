@@ -149,6 +149,7 @@ class StorageTest {
                 OtpAlgorithm.Sha1,
                 6,
                 30,
+                null,
                 "",
                 1_700_000_000,
             ),

@@ -45,7 +45,7 @@ class SyncTest {
     /** The entry these tests move between devices, written at the instant they all start from. */
     private fun addEntry(vault: Vault, updatedAt: Long = 1_700_000_000L): String =
         assertNotNull(
-            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", updatedAt),
+            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", updatedAt),
             "adding an entry must succeed",
         )
 
@@ -101,7 +101,7 @@ class SyncTest {
 
         val edited = 1_700_000_120L
         assertTrue(
-            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", edited),
+            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", edited),
             "the edit must be accepted",
         )
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L), "the deletion must be accepted")
@@ -162,7 +162,7 @@ class SyncTest {
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 
-        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_120L))
+        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_120L))
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 

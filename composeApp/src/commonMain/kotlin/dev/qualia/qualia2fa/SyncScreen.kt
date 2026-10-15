@@ -53,7 +53,6 @@ import dev.qualia.qualia2fa.resources.sync_conflict_local_is_newer
 import dev.qualia.qualia2fa.resources.sync_conflict_peer_deleted
 import dev.qualia.qualia2fa.resources.sync_conflict_side_deleted
 import dev.qualia.qualia2fa.resources.sync_conflict_side_incoming
-import dev.qualia.qualia2fa.resources.sync_frames_explainer
 import dev.qualia.qualia2fa.resources.sync_frames_count
 import dev.qualia.qualia2fa.resources.sync_conflict_side_local
 import dev.qualia.qualia2fa.resources.sync_error_already_applied
@@ -338,13 +337,10 @@ fun SyncScreen(
                 Text(stringResource(Res.string.action_generate_code))
             }
             myCode?.let { code ->
-                val frames = remember(code) { Qualia.qrFrames(code) }
-                if (frames != null && frames.count > 1) {
-                    Hint(stringResource(Res.string.sync_frames_explainer))
-                    FramedCode(frames = frames, code = code, onCopied = { message = copied })
-                } else {
-                    CodeBlock(code = code, onCopied = { message = copied })
-                }
+                // One code or a sequence of them, decided where every other code is drawn:
+                // what this screen hands over is the text, and how many symbols it takes to
+                // show it is the transport's answer.
+                CodeBlock(code = code, onCopied = { message = copied })
             }
         }
 

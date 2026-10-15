@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_copy
-import dev.qualia.qualia2fa.resources.sync_frames_counter
+import dev.qualia.qualia2fa.resources.code_frames_counter
+import dev.qualia.qualia2fa.resources.code_frames_explainer
+import dev.qualia.qualia2fa.resources.code_frames_progress
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -143,13 +145,34 @@ fun LabeledValue(label: String, value: String) {
  * The text stays underneath the code on purpose. A code too dense to scan — which is what a
  * full vault produces — must still leave the user a way to carry it across, and a code too
  * large to draw at all leaves only the text.
+ *
+ * # One code or several
+ *
+ * The drawing comes from the multi-frame path even when the payload fits in one code: the
+ * transport answers a payload that fits with a sequence of one, drawn module for module as the
+ * single-code path draws it, so there is one path here rather than two and a payload that
+ * outgrows one symbol is drawn instead of being silently left out.
  */
 @Composable
 fun CodeBlock(code: String, onCopied: () -> Unit) {
+    val frames = remember(code) { Qualia.qrFrames(code) }
+
+    if (frames != null && frames.count > 1) {
+        FramedCode(frames = frames, code = code, onCopied = onCopied)
+    } else {
+        // `null` is a payload too large for the format at any version this facade draws, so
+        // there is nothing to show but the text; a sequence of one is that one image.
+        SingleCode(code = code, image = frames?.image(0), onCopied = onCopied)
+    }
+}
+
+/** The drawing of a code that is one image: the code, its text, and the way to copy it. */
+@Composable
+private fun SingleCode(code: String, image: QrImage?, onCopied: () -> Unit) {
     val clipboard = LocalClipboardManager.current
 
     Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-        remember(code) { Qualia.qrImage(code) }?.let { image -> QrCodeView(image) }
+        image?.let { QrCodeView(it) }
         Text(
             code,
             style = MaterialTheme.typography.bodySmall,
@@ -169,7 +192,9 @@ fun CodeBlock(code: String, onCopied: () -> Unit) {
  *
  * The counter is not decoration: a user holding a camera at the screen has to know how far
  * along the sequence is and that it starts over, or a code that cycles looks like one that
- * flickers — and the image they missed is the one that matters.
+ * flickers — and the image they missed is the one that matters. The line above the code says
+ * the same thing in words, because the counter alone does not say that the rest of the payload
+ * is in the images that follow.
  */
 @Composable
 fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
@@ -184,8 +209,9 @@ fun FramedCode(frames: QrFrames, code: String, onCopied: () -> Unit) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
+        Hint(stringResource(Res.string.code_frames_explainer))
         QrCodeView(frames.image(shown))
-        Text(stringResource(Res.string.sync_frames_counter, shown + 1, frames.count))
+        Text(stringResource(Res.string.code_frames_counter, shown + 1, frames.count))
         Text(code, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
         TextButton(onClick = {
             clipboard.setText(AnnotatedString(code))
@@ -212,6 +238,14 @@ private val FRAME_INTERVAL = 1200.milliseconds
  * The three screens that take a code ask for the same two controls in the same order, and what
  * each of them does with the text differs, so the callbacks come from the screen. So do the two
  * failures of the scanner: they are worded for what the screen was looking for.
+ *
+ * # A code that is one of several
+ *
+ * A payload too large for one symbol arrives as several codes, and this is where they are
+ * collected: the scanner stays open while the sequence is incomplete and says how far along it
+ * is, and what reaches [onScanned] is the reassembled payload rather than the last piece of it.
+ * A code that is not part of a sequence is unaffected — a sequence of one completes on the
+ * first read — and so is text typed or pasted into the field.
  */
 @Composable
 fun CodeField(
@@ -225,6 +259,11 @@ fun CodeField(
     onMessage: (String?) -> Unit,
 ) {
     val scanner = LocalCodeScanner.current
+    val collector = remember { Qualia.frameCollector() }
+    // How many codes were taken and how many the set has, which is what the screen says while
+    // the user works through the sequence; the count is unknown until one of them says it.
+    var collected by remember { mutableStateOf<Pair<Int, Int?>?>(null) }
+    var completed by remember { mutableStateOf<String?>(null) }
 
     OutlinedTextField(
         value = value,
@@ -236,11 +275,40 @@ fun CodeField(
         scanner.readCode(
             unreadable = unreadable,
             noCode = noCode,
-            onText = onScanned,
+            onFrame = { scanned ->
+                when (val step = collector?.push(scanned)) {
+                    is FrameStep.Completed -> {
+                        // Held rather than handed over here: the scanner closes with the text of
+                        // the code it just read, and that text is one piece of the payload.
+                        completed = step.payload.decodeToString()
+                        collected = collector?.let { it.received to it.expected }
+                        null
+                    }
+
+                    is FrameStep.Taken -> {
+                        collected = collector?.let { it.received to it.expected }
+                        FrameCount(step.index, step.count)
+                    }
+
+                    else -> null
+                }
+            },
+            onText = { scanned ->
+                val payload = completed
+                completed = null
+                collected = null
+                // The code carries this application's envelope; what belongs in the field is what
+                // was put into it. A code that is one of several was reassembled above, so the
+                // envelope to take off is the payload's rather than the last frame's.
+                onScanned(payload?.let { Qualia.unwrapQrText(it) ?: it } ?: Qualia.unwrapQrText(scanned) ?: scanned)
+            },
             onMessage = onMessage,
         )
     }) {
         Text(scanLabel)
+    }
+    collected?.let { (received, expected) ->
+        Hint(stringResource(Res.string.code_frames_progress, received, expected ?: received))
     }
 }
 

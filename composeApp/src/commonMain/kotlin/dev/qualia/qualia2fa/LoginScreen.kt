@@ -11,23 +11,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.qualia.qualia2fa.resources.Res
+import dev.qualia.qualia2fa.resources.action_cancel
 import dev.qualia.qualia2fa.resources.action_create_vault
 import dev.qualia.qualia2fa.resources.action_join_existing_account
+import dev.qualia.qualia2fa.resources.action_reset
+import dev.qualia.qualia2fa.resources.action_reset_master_key
 import dev.qualia.qualia2fa.resources.action_unlock
+import dev.qualia.qualia2fa.resources.dialog_reset_title
 import dev.qualia.qualia2fa.resources.first_run_intro
 import dev.qualia.qualia2fa.resources.first_run_join_explainer
 import dev.qualia.qualia2fa.resources.first_run_no_hardware_warning
 import dev.qualia.qualia2fa.resources.login_key_unreadable
 import dev.qualia.qualia2fa.resources.login_locked_explainer
+import dev.qualia.qualia2fa.resources.login_reset_hint
+import dev.qualia.qualia2fa.resources.login_reset_text
 import dev.qualia.qualia2fa.resources.login_subtitle
 import dev.qualia.qualia2fa.resources.login_vault_missing
 import dev.qualia.qualia2fa.resources.status_locked
@@ -56,6 +68,18 @@ enum class LoginMode {
 }
 
 /**
+ * Whether this state offers the reset.
+ *
+ * The two states where the device holds something it can no longer use: a master key that will
+ * not open the vault, or a vault whose key is gone. Resetting is the way out of both, because
+ * neither can be repaired from here — and it is offered **nowhere else**: on a first run there
+ * is nothing to remove, and a locked vault is opened rather than destroyed. Creating a vault
+ * over an existing key is the one action that must not be offered on those two states, which is
+ * why they are separate states at all.
+ */
+internal fun LoginMode.offersReset(): Boolean = this == LoginMode.Unreadable || this == LoginMode.VaultMissing
+
+/**
  * The first screen with anything to act on: the mark, the name, and what this device can do.
  *
  * The arrangement follows the design: in a wide landscape window the actions sit beside the
@@ -67,6 +91,11 @@ enum class LoginMode {
  * The design does not put one here, but this is the last screen before the vault is open: a
  * user who cannot read the interface has no way to reach the settings that would change it,
  * and reading the interface is exactly what they cannot do yet.
+ *
+ * # The reset is an extension too
+ *
+ * It is the only destructive action reachable without an open vault, so it asks before it acts
+ * and the dialog says what it deletes.
  */
 @Composable
 fun LoginScreen(
@@ -79,7 +108,10 @@ fun LoginScreen(
     onCreateVault: () -> Unit,
     onJoin: () -> Unit,
     onUnlock: () -> Unit,
+    onReset: () -> Unit,
 ) {
+    var confirmingReset by remember { mutableStateOf(false) }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val layout = loginLayout(maxWidth, maxHeight)
 
@@ -93,7 +125,18 @@ fun LoginScreen(
                     Brand(showTitle = layout.showTitle)
                 }
                 Column(Modifier.weight(1f)) {
-                    Actions(mode, reason, hardwareBacked, message, language, onSelectLanguage, onCreateVault, onJoin, onUnlock)
+                    Actions(
+                        mode,
+                        reason,
+                        hardwareBacked,
+                        message,
+                        language,
+                        onSelectLanguage,
+                        onCreateVault,
+                        onJoin,
+                        onUnlock,
+                        onReset = { confirmingReset = true },
+                    )
                 }
             }
         } else {
@@ -110,10 +153,43 @@ fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(Space.xl),
                 ) {
                     Brand(showTitle = layout.showTitle)
-                    Actions(mode, reason, hardwareBacked, message, language, onSelectLanguage, onCreateVault, onJoin, onUnlock)
+                    Actions(
+                        mode,
+                        reason,
+                        hardwareBacked,
+                        message,
+                        language,
+                        onSelectLanguage,
+                        onCreateVault,
+                        onJoin,
+                        onUnlock,
+                        onReset = { confirmingReset = true },
+                    )
                 }
             }
         }
+    }
+
+    if (confirmingReset) {
+        AlertDialog(
+            onDismissRequest = { confirmingReset = false },
+            properties = DialogDefaults,
+            title = { Text(stringResource(Res.string.dialog_reset_title)) },
+            text = { Text(stringResource(Res.string.login_reset_text)) },
+            confirmButton = {
+                Button(onClick = {
+                    confirmingReset = false
+                    onReset()
+                }) {
+                    Text(stringResource(Res.string.action_reset))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingReset = false }) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+            },
+        )
     }
 }
 
@@ -129,6 +205,7 @@ private fun Actions(
     onCreateVault: () -> Unit,
     onJoin: () -> Unit,
     onUnlock: () -> Unit,
+    onReset: () -> Unit,
 ) {
     val warningColor = MaterialTheme.colorScheme.error
 
@@ -196,6 +273,13 @@ private fun Actions(
                     Text(stringResource(Res.string.action_join_existing_account))
                 }
             }
+        }
+
+        if (mode.offersReset()) {
+            OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.action_reset_master_key))
+            }
+            Hint(stringResource(Res.string.login_reset_hint))
         }
 
         MessageLine(message)

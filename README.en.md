@@ -43,17 +43,25 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   is written beside the vault file is the **wrapped** form; the store is reported as it is —
   TPM, Android Keystore or software), or log in by pairing with a device that is already
   unlocked. A device that already holds a master key is only offered unlocking and logging in:
-  creating a vault there would replace that key
+  creating a vault there would replace that key. When the vault cannot be opened at all — the
+  key no longer unwraps it, or the file is gone — that screen offers a reset instead, which
+  says what it deletes and asks before it acts
 - **Entries**: add, edit and delete by hand, import one from an `otpauth://` QR code in an
   image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
-  because the tombstone reaches every device the account syncs with
-- **Codes**: live display, countdown ring, one-click copy (the clipboard is cleared again
-  after 30 seconds, and only if it still holds what was copied). All three HMAC algorithms are
-  supported — SHA-1, SHA-256 and SHA-512 — chosen in the entry editor and carried in from the
+  because the tombstone reaches every device the account syncs with. An entry is either
+  time-based or counter-based, chosen in the editor, and a link or a QR code imported brings
+  the kind it declares with it
+- **Codes**: live display, one-click copy (the clipboard is cleared again after 30 seconds, and
+  only if it still holds what was copied). A time-based entry counts its step down and shows the
+  ring; a counter-based one shows the counter its code belongs to and moves to the next one from
+  **next code**, which is what a server that consumed a code expects. All three HMAC algorithms
+  are supported — SHA-1, SHA-256 and SHA-512 — chosen in the entry editor and carried in from the
   `algorithm` parameter when a link or a QR code is imported (SHA-1 being what the
   `otpauth://` scheme itself means when it says nothing)
-- **Pairing**: started from the sync screen; a pairing code can be drawn as a QR code and
-  read back out of an image, and the text always stays underneath the code
+- **Pairing**: started from the sync screen; the pairing code, the request and the answer all
+  take the same code path a sync code does — one symbol when the payload fits, several shown in
+  turn when it does not, collected one by one as they are read — and the text always stays
+  underneath the code
 - **Syncing**: two devices show one code each, one direction at a time; wherever the two
   disagree, the user decides entry by entry
 - **On the same WiFi or hotspot**: pairing requests and sync payloads no longer have to be

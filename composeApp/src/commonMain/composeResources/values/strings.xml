@@ -34,6 +34,8 @@
     <string name="login_locked_explainer">The vault is locked. Unlocking takes the master key out of the platform key store again; there is no password to type.</string>
     <string name="login_key_unreadable">This device holds a master key that cannot be read right now. Creating a new vault here would replace it and its entries would be lost, so do not do that before trying the recovery key on another device.</string>
     <string name="login_vault_missing">This device holds a master key, but its vault file is gone. Logging in from another device of the same account brings the entries back; creating a vault here would draw a new key and cut this device off from the account.</string>
+    <string name="login_reset_hint">If this device can no longer open the vault, resetting it is the way back to a device that can register again or log in from another one.</string>
+    <string name="login_reset_text">Resetting deletes everything this device holds for the account: the vault file, the wrapped bytes kept beside it, and the entry in the platform key store that could unwrap them. Entries that were not exported or synced are gone, and this device cannot open that vault again. The device identity is kept, so this device can still log in to the account.</string>
     <string name="error_serialize_failed">Creation failed: the core cannot serialize the vault.</string>
     <string name="error_no_platform_key_store">Creation failed: the platform key store is unavailable, and the core refused a local-only vault as well.</string>
 
@@ -63,12 +65,14 @@
     <string name="action_copy">Copy</string>
     <string name="action_edit">Edit</string>
     <string name="action_delete">Delete</string>
+    <string name="action_next_code">Next code</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_back">Back</string>
     <string name="action_done">Done</string>
     <string name="action_continue">Continue</string>
     <string name="code_changes_in">Changes in %1$d s</string>
+    <string name="code_counter">Counter %1$d</string>
     <string name="message_copied">Copied.</string>
     <string name="message_copied_and_cleared">Copied; the clipboard is cleared again after 30 seconds.</string>
     <string name="default_entry_name">Untitled</string>
@@ -81,9 +85,13 @@
     <string name="field_issuer">Service</string>
     <string name="field_account">Account</string>
     <string name="field_secret">Secret (Base32)</string>
+    <string name="field_entry_type">Type</string>
+    <string name="entry_type_totp">Time-based (TOTP)</string>
+    <string name="entry_type_hotp">Counter-based (HOTP)</string>
     <string name="field_algorithm">Algorithm</string>
     <string name="field_digits">Digits</string>
     <string name="field_period">Period (seconds)</string>
+    <string name="field_counter">Counter</string>
     <string name="action_generate_secret">Generate a random secret</string>
 
     <!-- Results of entry operations -->
@@ -266,9 +274,9 @@
     <string name="hint_secret_kept">Leave it blank to keep the current secret</string>
 
     <!-- A code that needs several images -->
-    <string name="sync_frames_explainer">This code does not fit in one QR code, so several are shown in turn: read each of them with the other device.</string>
-    <string name="sync_frames_counter">%1$d of %2$d</string>
-    <string name="sync_frames_progress">Collected %1$d of %2$d.</string>
+    <string name="code_frames_explainer">This code does not fit in one QR code, so several are shown in turn: read each of them with the other device.</string>
+    <string name="code_frames_counter">%1$d of %2$d</string>
+    <string name="code_frames_progress">Collected %1$d of %2$d.</string>
     <string name="sync_frames_received">Collected %1$d.</string>
     <string name="scan_keep_going">Got it — keep scanning the rest.</string>
     <string name="scan_frame_taken">Frame %1$d of %2$d</string>

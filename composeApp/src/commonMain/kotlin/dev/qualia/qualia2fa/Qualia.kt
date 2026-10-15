@@ -137,6 +137,10 @@ enum class OtpAlgorithm {
  * One entry, as the user interface sees it.
  *
  * A plain Kotlin value: no generated type crosses this boundary.
+ *
+ * [counter] is the whole of what tells a counter-based entry from a time-based one — the
+ * vault stores no separate kind — so [isCounterBased] is derived from it rather than kept
+ * beside it.
  */
 data class Entry(
     val id: String,
@@ -171,13 +175,62 @@ class Vault internal constructor(private val inner: FfiVault) {
     /**
      * The current time-based code for [id], or `null` when the entry is counter based or
      * the code cannot be computed.
+     *
+     * A counter-based entry has no code at a moment in time: its code belongs to a counter,
+     * and asking the library for a time-based one anyway would produce a plausible code that
+     * is always wrong. [counterCode] is what answers for those entries, and [codeFor] is the
+     * call that picks between the two from the entry itself.
      */
     fun code(id: String, unixTime: Long): String? =
         try {
-            inner.totpFor(id, unixTime.toULong())
+            if (inner.entry(id)?.counter != null) null else inner.totpFor(id, unixTime.toULong())
         } catch (_: Exception) {
             null
         }
+
+    /**
+     * The RFC 4226 code for the counter-based entry [id] at [counter].
+     *
+     * [counter] is the value the code belongs to, not a step to move by: a server consumes a
+     * code by moving to the next counter, and [advanceCounter] is what records that move here.
+     * Returns `null` when the entry is time based or the code cannot be computed.
+     */
+    fun counterCode(id: String, counter: Long): String? =
+        try {
+            if (inner.entry(id)?.counter == null) null else inner.hotpFor(id, counter.toULong())
+        } catch (_: Exception) {
+            null
+        }
+
+    /**
+     * The code [entry] shows now: its counter's code when it counts, the current step's when it
+     * does not.
+     *
+     * One call for both kinds, so that a screen cannot show a time-based code for an entry whose
+     * codes belong to a counter.
+     */
+    fun codeFor(entry: Entry, unixTime: Long): String? =
+        entry.counter?.let { counterCode(entry.id, it) } ?: code(entry.id, unixTime)
+
+    /**
+     * Moves a counter-based entry to its next counter.
+     *
+     * A counter is consumed by use: the server that accepted the code at counter `n` expects
+     * counter `n + 1` next, so advancing is what makes the next code the one that works.
+     * Returns false when the entry does not exist, is time based, or is already at the largest
+     * counter the field can hold.
+     */
+    fun advanceCounter(id: String, unixTime: Long): Boolean {
+        return try {
+            val entry = inner.entry(id) ?: return false
+            val counter = entry.counter ?: return false
+            if (counter >= Long.MAX_VALUE.toULong()) return false
+            inner.updateEntry(entry.copy(counter = counter + 1uL), unixTime.toULong())
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /**
      * Adds an entry and returns its identifier, or `null` when the secret or the
@@ -185,7 +238,8 @@ class Vault internal constructor(private val inner: FfiVault) {
      *
      * [algorithm] is required rather than defaulted: a default here would be the one place an
      * SHA-256 link could quietly become an SHA-1 entry, and the codes would be wrong rather
-     * than missing.
+     * than missing. [counter] is required for the same reason: `null` asks for a time-based
+     * entry, and a caller that forgot it would otherwise get one where it meant a counter.
      */
     fun addEntry(
         name: String,
@@ -195,12 +249,23 @@ class Vault internal constructor(private val inner: FfiVault) {
         algorithm: OtpAlgorithm,
         digits: Int,
         periodSeconds: Long,
+        counter: Long?,
         note: String,
         unixTime: Long,
     ): String? {
         val entry =
-            buildEntry(PLACEHOLDER_ID, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note)
-                ?: return null
+            buildEntry(
+                PLACEHOLDER_ID,
+                name,
+                issuer,
+                account,
+                secretBase32,
+                algorithm,
+                digits,
+                periodSeconds,
+                counter,
+                note,
+            ) ?: return null
         return try {
             inner.addEntry(entry, unixTime.toULong())
         } catch (_: Exception) {
@@ -212,7 +277,9 @@ class Vault internal constructor(private val inner: FfiVault) {
      * Replaces the content of [id], keeping the identifier and the creation time, which
      * the core preserves on its own.
      *
-     * Returns false when the entry does not exist or the new content is rejected.
+     * Returns false when the entry does not exist or the new content is rejected. [counter]
+     * carries the same meaning as in [addEntry], and `null` turns a counter-based entry into a
+     * time-based one.
      */
     fun updateEntry(
         id: String,
@@ -223,11 +290,12 @@ class Vault internal constructor(private val inner: FfiVault) {
         algorithm: OtpAlgorithm,
         digits: Int,
         periodSeconds: Long,
+        counter: Long?,
         note: String,
         unixTime: Long,
     ): Boolean {
         val entry =
-            buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, note)
+            buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, counter, note)
                 ?: return false
         return try {
             inner.updateEntry(entry, unixTime.toULong())
@@ -298,6 +366,10 @@ class Vault internal constructor(private val inner: FfiVault) {
  *
  * The timestamps are left at zero: the core stamps a new entry itself and preserves the
  * creation time of an existing one, so sending anything here would be ignored at best.
+ *
+ * [counter] is `null` for a time-based entry and the counter it starts from for a
+ * counter-based one: the core's entry has no separate kind field, so this is what says which
+ * of the two an entry is.
  */
 private fun buildEntry(
     id: String,
@@ -308,6 +380,7 @@ private fun buildEntry(
     algorithm: OtpAlgorithm,
     digits: Int,
     periodSeconds: Long,
+    counter: Long?,
     note: String,
 ): FfiVaultEntry? {
     val ffiDigits = digitsOf(digits) ?: return null
@@ -320,13 +393,20 @@ private fun buildEntry(
         algorithm = algorithm.toFfi(),
         digits = ffiDigits,
         period = periodSeconds.toULong(),
-        counter = null,
+        counter = counter?.toULong(),
         note = note,
         createdAt = 0uL,
         updatedAt = 0uL,
     )
 }
 
+/**
+ * Converts one entry for the user interface.
+ *
+ * The counter crosses the boundary as an unsigned 64-bit value and is carried here as a signed
+ * one: a value above `Long.MAX_VALUE` therefore arrives negative, which is the same bit pattern
+ * the library takes back, so a counter survives the round trip whatever its value.
+ */
 private fun FfiVaultEntry.toEntry(): Entry =
     Entry(
         id = id,
@@ -544,6 +624,7 @@ object Qualia {
                     algorithm = parsed.algorithm.toFacade(),
                     digits = parsed.digits.toCount(),
                     periodSeconds = parsed.period.toLong(),
+                    counter = parsed.counter?.toLong(),
                 )
             } catch (_: Exception) {
                 null
@@ -1462,6 +1543,14 @@ data class OtpAuthLink(
     val algorithm: OtpAlgorithm,
     val digits: Int,
     val periodSeconds: Long,
+    /**
+     * The counter the link names, or `null` when it names none.
+     *
+     * This is also which of the two kinds of entry the link describes: the core refuses a
+     * counter-based link without a counter and a time-based one that carries a counter, so a
+     * value here means exactly `otpauth://hotp/…`, exactly as a counter in an entry does.
+     */
+    val counter: Long?,
 )
 
 /**

@@ -53,12 +53,14 @@ import dev.qualia.qualia2fa.resources.action_done
 import dev.qualia.qualia2fa.resources.action_edit
 import dev.qualia.qualia2fa.resources.action_generate_secret
 import dev.qualia.qualia2fa.resources.action_import
+import dev.qualia.qualia2fa.resources.action_next_code
 import dev.qualia.qualia2fa.resources.action_save
 import dev.qualia.qualia2fa.resources.cd_add_entry
 import dev.qualia.qualia2fa.resources.cd_enter_selection
 import dev.qualia.qualia2fa.resources.cd_selection_all
 import dev.qualia.qualia2fa.resources.cd_selection_none
 import dev.qualia.qualia2fa.resources.code_changes_in
+import dev.qualia.qualia2fa.resources.code_counter
 import dev.qualia.qualia2fa.resources.default_entry_name
 import dev.qualia.qualia2fa.resources.default_imported_entry_name
 import dev.qualia.qualia2fa.resources.dialog_add_entry
@@ -68,6 +70,8 @@ import dev.qualia.qualia2fa.resources.dialog_delete_selected_text
 import dev.qualia.qualia2fa.resources.dialog_delete_selected_title
 import dev.qualia.qualia2fa.resources.dialog_edit_entry
 import dev.qualia.qualia2fa.resources.dialog_import_link
+import dev.qualia.qualia2fa.resources.entry_type_hotp
+import dev.qualia.qualia2fa.resources.entry_type_totp
 import dev.qualia.qualia2fa.resources.error_entry_not_saved
 import dev.qualia.qualia2fa.resources.error_entry_rejected
 import dev.qualia.qualia2fa.resources.error_image_has_no_entry
@@ -75,7 +79,9 @@ import dev.qualia.qualia2fa.resources.error_image_unreadable
 import dev.qualia.qualia2fa.resources.error_link_rejected
 import dev.qualia.qualia2fa.resources.field_account
 import dev.qualia.qualia2fa.resources.field_algorithm
+import dev.qualia.qualia2fa.resources.field_counter
 import dev.qualia.qualia2fa.resources.field_digits
+import dev.qualia.qualia2fa.resources.field_entry_type
 import dev.qualia.qualia2fa.resources.field_issuer
 import dev.qualia.qualia2fa.resources.field_name
 import dev.qualia.qualia2fa.resources.field_otpauth_link
@@ -184,6 +190,10 @@ fun TwoFactorScreen(
                 algorithm = link.algorithm,
                 digits = link.digits,
                 periodSeconds = link.periodSeconds,
+                // The link's kind as well: a counter here is what makes the new entry
+                // counter-based, and importing `otpauth://hotp/` without it would produce
+                // time-based codes for an entry whose server counts.
+                counter = link.counter,
                 note = "",
                 unixTime = currentTimeSeconds(),
             )
@@ -311,12 +321,13 @@ fun TwoFactorScreen(
             items(entries, key = { it.id }) { entry ->
                 // Read once a second, and the code asked of the library only when its step turns
                 // over: a code is the same value for the whole of its step, and asking for one on
-                // every composition is a crossing into the library per card per frame.
+                // every composition is a crossing into the library per card per frame. A
+                // counter-based entry has no step, so what changes it is the counter itself.
                 val at = clock.value
                 EntryCard(
                     entry = entry,
-                    code = remember(entry.id, at / entry.periodSeconds.coerceAtLeast(1)) {
-                        vault.code(entry.id, at)
+                    code = remember(entry.id, entry.counter, at / entry.periodSeconds.coerceAtLeast(1)) {
+                        vault.codeFor(entry, at)
                     },
                     clock = clock,
                     selected = if (selecting) entry.id in selected else null,
@@ -327,6 +338,14 @@ fun TwoFactorScreen(
                         clipboard.setText(AnnotatedString(code))
                         copied = code
                         message = copiedAndCleared
+                    },
+                    onAdvance = {
+                        if (vault.advanceCounter(entry.id, currentTimeSeconds())) {
+                            refresh()
+                            message = null
+                        } else {
+                            message = entryNotSaved
+                        }
                     },
                     onDelete = { deletingEntry = entry },
                     onEdit = { editing = entry },
@@ -413,32 +432,34 @@ fun TwoFactorScreen(
                 adding = false
                 editing = null
             },
-            onSave = { name, issuer, account, secret, algorithm, digits, period ->
+            onSave = { form ->
                 val accepted =
                     if (beingEdited == null) {
                         vault.addEntry(
-                            name = name,
-                            issuer = issuer,
-                            account = account,
-                            secretBase32 = secret,
-                            algorithm = algorithm,
-                            digits = digits,
-                            periodSeconds = period,
+                            name = form.name,
+                            issuer = form.issuer,
+                            account = form.account,
+                            secretBase32 = form.secretBase32,
+                            algorithm = form.algorithm,
+                            digits = form.digits,
+                            periodSeconds = form.periodSeconds,
+                            counter = form.counter,
                             note = "",
                             unixTime = currentTimeSeconds(),
                         ) != null
                     } else {
                         vault.updateEntry(
                             id = beingEdited.id,
-                            name = name,
-                            issuer = issuer,
-                            account = account,
+                            name = form.name,
+                            issuer = form.issuer,
+                            account = form.account,
                             // An empty field means "leave the secret as it is": the dialog is
                             // never given the current one, so it cannot hand it back.
-                            secretBase32 = secret.ifBlank { beingEdited.secretBase32 },
-                            algorithm = algorithm,
-                            digits = digits,
-                            periodSeconds = period,
+                            secretBase32 = form.secretBase32.ifBlank { beingEdited.secretBase32 },
+                            algorithm = form.algorithm,
+                            digits = form.digits,
+                            periodSeconds = form.periodSeconds,
+                            counter = form.counter,
                             note = beingEdited.note,
                             unixTime = currentTimeSeconds(),
                         )
@@ -476,6 +497,14 @@ fun TwoFactorScreen(
  * The account and the algorithm are deliberately **not** shown: they are what the editor is
  * for, and on a card that is one column of several they would cost a line each for something
  * the user reads once.
+ *
+ * # The two kinds of entry
+ *
+ * A time-based entry changes by itself, so its bottom line counts the step down. A
+ * counter-based one changes when the server consumes a code, so the same line shows the counter
+ * the code belongs to and offers **next code**, which is the action that moves it. Neither
+ * happens on the other kind: a counter on a card that also counted down would be two claims
+ * about when the code changes.
  */
 @Composable
 private fun EntryCard(
@@ -485,12 +514,14 @@ private fun EntryCard(
     selected: Boolean?,
     onToggleSelection: () -> Unit,
     onCopy: (String) -> Unit,
+    onAdvance: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
 ) {
     val period = entry.periodSeconds.coerceAtLeast(1)
     val service = entry.issuer.takeIf { it.isNotBlank() }
-    val changing = code != null && !entry.isCounterBased
+    val counter = entry.counter
+    val changing = code != null && counter == null
 
     Card(
         modifier =
@@ -571,17 +602,31 @@ private fun EntryCard(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CountdownText(
-                        clock = clock,
-                        period = period,
-                        changing = changing,
-                        modifier = Modifier.weight(1f),
-                    )
+                    if (counter == null) {
+                        CountdownText(
+                            clock = clock,
+                            period = period,
+                            changing = changing,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(Res.string.code_counter, counter),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     if (changing) {
                         CountdownRing(
                             clock = clock,
                             period = period,
                             modifier = Modifier.size(Sizes.ring).padding(end = Space.s),
+                        )
+                    }
+                    if (counter != null) {
+                        CompactTextButton(
+                            label = stringResource(Res.string.action_next_code),
+                            onClick = onAdvance,
                         )
                     }
                     CompactTextButton(label = stringResource(Res.string.action_delete), onClick = onDelete)
@@ -718,13 +763,52 @@ private fun FormRow(
     )
 }
 
+/**
+ * Which of the two kinds of code an entry is described by.
+ *
+ * The vault stores no such field: what makes an entry counter-based is the counter it carries,
+ * so this is the editor's own name for the choice, and [EntryForm.counter] is where it lands.
+ */
+private enum class EntryKind {
+    /** TOTP: the code follows the clock, and the entry carries no counter. */
+    TimeBased,
+
+    /** HOTP: the code follows a counter, which advances when a server consumes a code. */
+    CounterBased,
+}
+
+/**
+ * What the entry editor collected, which is exactly what is written to the vault.
+ *
+ * A value rather than the seven arguments the dialog used to hand over: the two kinds of entry
+ * fill the same fields with different meanings, and a caller reading named members cannot
+ * mistake the counter for the period.
+ */
+private data class EntryForm(
+    val name: String,
+    val issuer: String,
+    val account: String,
+    val secretBase32: String,
+    val algorithm: OtpAlgorithm,
+    val digits: Int,
+    val periodSeconds: Long,
+    /** The counter to store, or `null` for a time-based entry. */
+    val counter: Long?,
+)
+
+/** The period a new entry starts with, which is the step RFC 6238's own examples use. */
+private const val DEFAULT_PERIOD_SECONDS = 30L
+
+/** The counter a new counter-based entry starts at, which is RFC 4226's first counter. */
+private const val DEFAULT_COUNTER = 0L
+
 /** The editor, for a new entry and for an existing one. */
 @Composable
 private fun EntryDialog(
     initial: Entry?,
     defaultName: String,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, OtpAlgorithm, Int, Long) -> Unit,
+    onSave: (EntryForm) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var issuer by remember { mutableStateOf(initial?.issuer.orEmpty()) }
@@ -742,7 +826,14 @@ private fun EntryDialog(
     var secret by remember { mutableStateOf(" ") }
     var algorithm by remember { mutableStateOf(initial?.algorithm ?: OtpAlgorithm.Sha1) }
     var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
-    var period by remember { mutableStateOf((initial?.periodSeconds ?: 30L).toString()) }
+    var period by remember { mutableStateOf((initial?.periodSeconds ?: DEFAULT_PERIOD_SECONDS).toString()) }
+    var kind by remember {
+        mutableStateOf(if (initial?.isCounterBased == true) EntryKind.CounterBased else EntryKind.TimeBased)
+    }
+    var counter by remember { mutableStateOf((initial?.counter ?: DEFAULT_COUNTER).toString()) }
+
+    val timeBasedLabel = stringResource(Res.string.entry_type_totp)
+    val counterBasedLabel = stringResource(Res.string.entry_type_hotp)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -807,6 +898,25 @@ private fun EntryDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    // The kind first, because it decides which of the last two fields is the
+                    // one that means something: a counter for an entry whose server counts, a
+                    // period for one whose code follows the clock.
+                    Text(stringResource(Res.string.field_entry_type), style = MaterialTheme.typography.labelLarge)
+                    ChoiceRow(
+                        options = EntryKind.entries,
+                        selected = kind,
+                        // Resolved above rather than here: the label of a choice is a plain
+                        // function, and a resource cannot be read outside composition.
+                        label = {
+                            when (it) {
+                                EntryKind.TimeBased -> timeBasedLabel
+                                EntryKind.CounterBased -> counterBasedLabel
+                            }
+                        },
+                        onSelect = { kind = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
                     // All three are shown at once: a user reading the algorithm off a server's
                     // setup page should find it without opening anything.
                     Text(stringResource(Res.string.field_algorithm), style = MaterialTheme.typography.labelLarge)
@@ -826,13 +936,25 @@ private fun EntryDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
-                        OutlinedTextField(
-                            value = period,
-                            onValueChange = { period = it },
-                            label = { Text(stringResource(Res.string.field_period)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
+                        when (kind) {
+                            EntryKind.TimeBased ->
+                                OutlinedTextField(
+                                    value = period,
+                                    onValueChange = { period = it },
+                                    label = { Text(stringResource(Res.string.field_period)) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                )
+
+                            EntryKind.CounterBased ->
+                                OutlinedTextField(
+                                    value = counter,
+                                    onValueChange = { counter = it },
+                                    label = { Text(stringResource(Res.string.field_counter)) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                )
+                        }
                     }
 
                     TextButton(onClick = { secret = Qualia.newSecret() }) {
@@ -843,29 +965,45 @@ private fun EntryDialog(
         },
         confirmButton = {
             // Nothing is defaulted on the way out: a digit count that is not one of the
-            // three the scheme has, or a period that is not a positive number, keeps Save
-            // disabled instead of quietly becoming something else.
+            // three the scheme has, a period that is not a positive number, or a counter that
+            // is not a whole number keeps Save disabled instead of quietly becoming something
+            // else. Only the field of the kind in effect is checked, because the other one is
+            // not on screen and so could not be corrected.
             val digitCount = digits.toIntOrNull()
             val periodSeconds = period.toLongOrNull()
+            val counterValue = counter.toLongOrNull()
             // A blank secret is a value only when there is one to keep: adding an entry needs
             // one, editing an entry leaves the current one alone.
             val acceptable =
                 (initial != null || secret.isNotBlank()) &&
                     digitCount != null &&
                     digitCount in 6..8 &&
-                    periodSeconds != null &&
-                    periodSeconds > 0
+                    when (kind) {
+                        EntryKind.TimeBased -> periodSeconds != null && periodSeconds > 0
+                        EntryKind.CounterBased -> counterValue != null && counterValue >= 0
+                    }
 
             Button(
                 onClick = {
                     onSave(
-                        name.ifBlank { defaultName },
-                        issuer,
-                        account,
-                        secret.trim().uppercase(),
-                        algorithm,
-                        requireNotNull(digitCount),
-                        requireNotNull(periodSeconds),
+                        EntryForm(
+                            name = name.ifBlank { defaultName },
+                            issuer = issuer,
+                            account = account,
+                            secretBase32 = secret.trim().uppercase(),
+                            algorithm = algorithm,
+                            digits = requireNotNull(digitCount),
+                            // A counter-based entry advances by counter, so its time step means
+                            // nothing: what is written is the field's own value when it still
+                            // holds one, and otherwise the scheme's default that the core's own
+                            // convention keeps there.
+                            periodSeconds =
+                                when (kind) {
+                                    EntryKind.TimeBased -> requireNotNull(periodSeconds)
+                                    EntryKind.CounterBased -> periodSeconds?.takeIf { it > 0 } ?: DEFAULT_PERIOD_SECONDS
+                                },
+                            counter = if (kind == EntryKind.CounterBased) requireNotNull(counterValue) else null,
+                        ),
                     )
                 },
                 enabled = acceptable,

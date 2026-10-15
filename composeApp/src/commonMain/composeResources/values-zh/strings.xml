@@ -27,6 +27,8 @@
     <string name="login_locked_explainer">保险库已锁定。解锁会重新从平台密钥库取出主密钥，不需要输入任何密码。</string>
     <string name="login_key_unreadable">这台设备上有一把现在读不出来的主密钥。在这里创建新保险库会顶掉它，里面的条目会一起丢失——先试试在另一台设备上用恢复密钥。</string>
     <string name="login_vault_missing">这台设备上有一把主密钥，但保险库文件不在了。从同一账号的另一台设备登录可以把条目带回来；在这里创建保险库会换一把新密钥，把本机从这个账号里切出去。</string>
+    <string name="login_reset_hint">如果本机已经打不开这个保险库，重置是回到「可以重新注册、或从另一台设备登录」的状态的办法。</string>
+    <string name="login_reset_text">重置会删掉本机为这个账号保存的全部内容：保险库文件、它旁边那份包裹字节，以及平台密钥库里能解开这些字节的那一条。没有导出、也没有同步过的条目会消失，本机也再也打不开那个保险库。设备身份保留，所以本机仍然可以登录这个账号。</string>
     <string name="error_serialize_failed">创建失败：核心无法序列化保险库</string>
     <string name="error_no_platform_key_store">创建失败：平台密钥库不可用，核心也拒绝了本机保险库</string>
 
@@ -56,12 +58,14 @@
     <string name="action_copy">复制</string>
     <string name="action_edit">编辑</string>
     <string name="action_delete">删除</string>
+    <string name="action_next_code">下一个验证码</string>
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>
     <string name="action_back">返回</string>
     <string name="action_done">完成</string>
     <string name="action_continue">继续</string>
     <string name="code_changes_in">%1$d 秒后更换</string>
+    <string name="code_counter">计数器 %1$d</string>
     <string name="message_copied">已复制。</string>
     <string name="message_copied_and_cleared">已复制；30 秒后自动清空剪贴板。</string>
     <string name="default_entry_name">未命名</string>
@@ -74,9 +78,13 @@
     <string name="field_issuer">服务</string>
     <string name="field_account">账号</string>
     <string name="field_secret">种子（Base32）</string>
+    <string name="field_entry_type">类型</string>
+    <string name="entry_type_totp">基于时间（TOTP）</string>
+    <string name="entry_type_hotp">基于计数器（HOTP）</string>
     <string name="field_algorithm">算法</string>
     <string name="field_digits">位数</string>
     <string name="field_period">周期（秒）</string>
+    <string name="field_counter">计数器</string>
     <string name="action_generate_secret">生成随机种子</string>
 
     <!-- 条目操作的结果 -->
@@ -259,9 +267,9 @@
     <string name="hint_secret_kept">留空则不改动</string>
 
     <!-- A code that needs several images -->
-    <string name="sync_frames_explainer">这个码一个二维码装不下，会依次显示多张：让另一台设备逐张扫描。</string>
-    <string name="sync_frames_counter">第 %1$d/%2$d 个</string>
-    <string name="sync_frames_progress">已收 %1$d/%2$d。</string>
+    <string name="code_frames_explainer">这个码一个二维码装不下，会依次显示多张：让另一台设备逐张扫描。</string>
+    <string name="code_frames_counter">第 %1$d/%2$d 个</string>
+    <string name="code_frames_progress">已收 %1$d/%2$d。</string>
     <string name="sync_frames_received">已收 %1$d 个。</string>
     <string name="scan_keep_going">已收到，继续扫剩下的。</string>
     <string name="scan_frame_taken">第 %1$d/%2$d 帧</string>

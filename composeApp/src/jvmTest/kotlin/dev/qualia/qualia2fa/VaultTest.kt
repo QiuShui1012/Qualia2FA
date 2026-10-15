@@ -2,6 +2,7 @@ package dev.qualia.qualia2fa
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -65,7 +66,7 @@ class VaultTest {
         }
 
         val hostVault = registration.vault
-        assertNotNull(hostVault.addEntry("Shared", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
+        assertNotNull(hostVault.addEntry("Shared", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000))
         val hostVaultFile = assertNotNull(hostVault.serialize())
 
         val host = assertNotNull(Qualia.beginPairing(), "the host side must start")
@@ -148,6 +149,7 @@ class VaultTest {
                 algorithm = OtpAlgorithm.Sha1,
                 digits = 6,
                 periodSeconds = 30,
+                counter = null,
                 note = "",
                 unixTime = 1_700_000_000,
             ),
@@ -169,12 +171,12 @@ class VaultTest {
     fun editingKeepsTheIdentifierAndChangesTheCode() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000))
         val before = vault.code(id, 59)
 
         val other = "MZXW6YTBOI======"
         assertTrue(
-            vault.updateEntry(id, "Renamed", "Issuer", "", other, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_001),
+            vault.updateEntry(id, "Renamed", "Issuer", "", other, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_001),
             "editing must succeed",
         )
 
@@ -190,9 +192,9 @@ class VaultTest {
     fun editingARejectedSecretChangesNothing() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
+        val id = assertNotNull(vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000))
 
-        assertTrue(!vault.updateEntry(id, "Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_001))
+        assertTrue(!vault.updateEntry(id, "Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_001))
         assertEquals("Test", assertNotNull(vault.entries().firstOrNull()).name)
     }
 
@@ -205,7 +207,7 @@ class VaultTest {
     fun aRecoveryFileRestoresTheKeyThatOpensTheVault() {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
-        assertNotNull(vault.addEntry("Test", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000))
+        assertNotNull(vault.addEntry("Test", "Example", "", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000))
         val vaultData = assertNotNull(vault.serialize())
 
         val file = assertNotNull(vault.recoveryFile("correct horse battery staple"), "exporting must succeed")
@@ -247,7 +249,7 @@ class VaultTest {
         val store = MemoryStore()
         val vault = assertNotNull(Qualia.createLocalVault(store))
         val id = assertNotNull(
-            vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000),
+            vault.addEntry("Test", "", "", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000),
         )
 
         assertTrue(vault.removeEntry(id, 1_700_000_001), "removing an entry must report success")
@@ -261,9 +263,152 @@ class VaultTest {
         val vault = assertNotNull(Qualia.createLocalVault(store))
 
         assertNull(
-            vault.addEntry("Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000),
+            vault.addEntry("Bad", "", "", "not base32!", OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000),
             "an invalid secret must be rejected rather than stored",
         )
         assertEquals(0, vault.entryCount)
+    }
+
+    /**
+     * Adds a counter-based entry of the RFC's own seed and returns its identifier.
+     *
+     * The seed is the ASCII `"12345678901234567890"` that RFC 4226 and RFC 6238 both publish, in
+     * Base32, which is what makes the vectors below reproducible rather than merely stable.
+     */
+    private fun addCounterEntry(vault: Vault, counter: Long = 0): String =
+        assertNotNull(
+            vault.addEntry(
+                name = "RFC 4226",
+                issuer = "Qualia",
+                account = "appendix-d",
+                secretBase32 = secret,
+                algorithm = OtpAlgorithm.Sha1,
+                digits = 6,
+                periodSeconds = 30,
+                counter = counter,
+                note = "",
+                unixTime = 1_700_000_000,
+            ),
+            "a counter-based entry must be accepted",
+        )
+
+    /**
+     * **RFC 4226 Appendix D**: a counter-based entry produces the published HOTP values.
+     *
+     * All ten vectors of the appendix are pinned, and they are the ones the core crate pins in
+     * its own `rfc_vectors` test, so this also says the fields survived both boundaries on the
+     * way to the HMAC: a counter, a digit count or a secret lost in between would produce a
+     * different code rather than an error, and a test that only asked for "six digits came out"
+     * would pass for every one of them.
+     */
+    @Test
+    fun aCounterBasedEntryProducesTheRfc4226AppendixDVectors() {
+        // RFC 4226 Appendix D, transcribed line by line: the Count column and the 6-digit
+        // decimal HOTP value beside it.
+        val vectors =
+            listOf(
+                0L to "755224",
+                1L to "287082",
+                2L to "359152",
+                3L to "969429",
+                4L to "338314",
+                5L to "254676",
+                6L to "287922",
+                7L to "162583",
+                8L to "399871",
+                9L to "520489",
+            )
+
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()), "a local vault must be creatable")
+        val id = addCounterEntry(vault)
+
+        val stored = assertNotNull(vault.entries().firstOrNull { it.id == id }, "the entry must be in the vault")
+        assertTrue(stored.isCounterBased, "an entry added with a counter must come back counter based")
+        assertEquals(0L, stored.counter, "the counter must survive the vault as the counter it was given")
+
+        for ((counter, want) in vectors) {
+            assertEquals(want, vault.counterCode(id, counter), "RFC 4226 Appendix D, Count = $counter")
+        }
+    }
+
+    /**
+     * A counter is consumed by use, so the entry moves to the next one — and the move is what the
+     * vault file keeps.
+     *
+     * This is the whole reason the counter is stored rather than derived: the code a server
+     * accepted belongs to the counter it was computed at, and the next code has to be the next
+     * one, across a restart as well.
+     */
+    @Test
+    fun aCounterBasedEntryMovesToItsNextCounterAndKeepsItInTheFile() {
+        val store = MemoryStore()
+        val vault = assertNotNull(Qualia.createLocalVault(store))
+        val id = addCounterEntry(vault)
+
+        assertEquals("755224", vault.counterCode(id, 0), "the first code is the first appendix D vector")
+
+        assertTrue(vault.advanceCounter(id, 1_700_000_001), "the counter must advance")
+        val moved = assertNotNull(vault.entries().firstOrNull { it.id == id }, "the entry must still be there")
+        assertEquals(1L, moved.counter, "the stored counter must be the next one")
+        assertEquals(
+            "287082",
+            vault.codeFor(moved, 1_700_000_001),
+            "the card must show the code of the counter the entry now holds, not of the one it had",
+        )
+
+        val reopened =
+            assertNotNull(
+                Qualia.openVault(assertNotNull(vault.serialize(), "the vault must serialize"), store),
+                "the key must open its own file",
+            )
+        val stored = assertNotNull(reopened.entries().firstOrNull { it.id == id }, "the entry must come back")
+        assertEquals(1L, stored.counter, "the counter must survive the file")
+        assertEquals("287082", reopened.codeFor(stored, 1_700_000_002), "and it must still be the code shown")
+    }
+
+    /**
+     * The two kinds answer for themselves and refuse each other.
+     *
+     * A time-based code asked of a counter-based entry would be a plausible code that never
+     * works, and the reverse is the same mistake; the vault is where that is caught, so a screen
+     * cannot make it by asking the wrong one.
+     */
+    @Test
+    fun theTwoKindsOfCodeRefuseEachOther() {
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()))
+        val counterId = addCounterEntry(vault)
+        val timeId =
+            assertNotNull(
+                vault.addEntry("RFC 6238", "Qualia", "appendix-b", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000),
+                "a time-based entry must be accepted",
+            )
+
+        assertNull(vault.code(counterId, 59), "a counter-based entry has no code at a moment in time")
+        assertNull(vault.counterCode(timeId, 0), "a time-based entry has no code at a counter")
+        assertEquals(Qualia.totp(secret, 59), vault.code(timeId, 59), "the time-based entry is unaffected")
+
+        assertFalse(vault.advanceCounter(timeId, 1_700_000_001), "a time-based entry has no counter to advance")
+        assertFalse(vault.advanceCounter("0".repeat(32), 1_700_000_001), "an entry that does not exist cannot move")
+
+        // An edit that drops the counter is what turns an entry back into a time-based one.
+        assertTrue(
+            vault.updateEntry(
+                id = counterId,
+                name = "RFC 4226",
+                issuer = "Qualia",
+                account = "appendix-d",
+                secretBase32 = secret,
+                algorithm = OtpAlgorithm.Sha1,
+                digits = 6,
+                periodSeconds = 30,
+                counter = null,
+                note = "",
+                unixTime = 1_700_000_002,
+            ),
+            "the edit must be accepted",
+        )
+        val edited = assertNotNull(vault.entries().firstOrNull { it.id == counterId }, "the entry must be there")
+        assertFalse(edited.isCounterBased, "dropping the counter must make the entry time based")
+        assertEquals(Qualia.totp(secret, 59), vault.code(counterId, 59))
     }
 }

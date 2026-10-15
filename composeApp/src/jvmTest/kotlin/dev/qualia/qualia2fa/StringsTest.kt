@@ -1,6 +1,7 @@
 package dev.qualia.qualia2fa
 
 import dev.qualia.qualia2fa.resources.Res
+import dev.qualia.qualia2fa.resources.code_counter
 import dev.qualia.qualia2fa.resources.selection_count
 import dev.qualia.qualia2fa.resources.status_locked
 import kotlinx.coroutines.runBlocking
@@ -109,6 +110,23 @@ class StringsTest {
             }
             withLocale("zh-CN") {
                 assertEquals("已选 3 项", getString(Res.string.selection_count, 3))
+            }
+        }
+
+    /**
+     * A counter's label takes a `Long`, which is what the entry card hands over.
+     *
+     * The counts above are `Int`s; a counter is not, so this pins the other overload of the
+     * placeholder rather than assuming the one that is already exercised covers it.
+     */
+    @Test
+    fun aCounterIsFormattedIntoItsLabel(): Unit =
+        runBlocking {
+            withLocale("en-US") {
+                assertEquals("Counter 0", getString(Res.string.code_counter, 0L))
+            }
+            withLocale("zh-CN") {
+                assertEquals("计数器 0", getString(Res.string.code_counter, 0L))
             }
         }
 

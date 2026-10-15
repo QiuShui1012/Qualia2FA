@@ -3,6 +3,7 @@ package dev.qualia.qualia2fa
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -65,6 +66,33 @@ class QualiaTest {
     }
 
     /**
+     * The link's kind is carried like its algorithm.
+     *
+     * `otpauth://hotp/` names the counter the codes start from, and an importer that dropped it
+     * would store a time-based entry for a server that counts: the codes would look right and
+     * never be accepted. The core refuses a counter-based link without a counter and a
+     * time-based one that carries a counter, so the field is exactly the kind of the link.
+     */
+    @Test
+    fun aCounterBasedLinkIsImportedWithItsCounter() {
+        val counterLink =
+            assertNotNull(
+                Qualia.parseOtpAuth(
+                    "otpauth://hotp/Qualia:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&counter=0",
+                ),
+                "a counter-based link must parse",
+            )
+        assertEquals(0L, counterLink.counter, "the counter of the link must be carried")
+
+        val timeLink =
+            assertNotNull(
+                Qualia.parseOtpAuth("otpauth://totp/Qualia:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"),
+                "a time-based link must parse",
+            )
+        assertNull(timeLink.counter, "a time-based link names no counter, which is what makes it time based")
+    }
+
+    /**
      * The path the "+" menu's link option takes: parse a link, add what it describes, and
      * compute a code from it.
      *
@@ -93,6 +121,7 @@ class QualiaTest {
                     algorithm = link.algorithm,
                     digits = link.digits,
                     periodSeconds = link.periodSeconds,
+                    counter = link.counter,
                     note = "",
                     unixTime = 59,
                 ),

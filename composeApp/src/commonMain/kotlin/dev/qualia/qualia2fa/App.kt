@@ -19,6 +19,7 @@ import dev.qualia.qualia2fa.resources.dialog_pick_image
 import dev.qualia.qualia2fa.resources.error_no_platform_key_store
 import dev.qualia.qualia2fa.resources.error_serialize_failed
 import dev.qualia.qualia2fa.resources.filter_image_files
+import dev.qualia.qualia2fa.resources.message_master_key_reset
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -96,6 +97,7 @@ fun App(storage: VaultStorage?, settings: SettingsStore) {
     // produce are the ones that outlive a screen change.
     val serializeFailed = stringResource(Res.string.error_serialize_failed)
     val noKeyStore = stringResource(Res.string.error_no_platform_key_store)
+    val masterKeyReset = stringResource(Res.string.message_master_key_reset)
 
     val picker = rememberFilePicker()
     val camera = hasCamera()
@@ -208,6 +210,22 @@ fun App(storage: VaultStorage?, settings: SettingsStore) {
     }
 
     /**
+     * Removes what this device holds and returns to the first run.
+     *
+     * One function for the two places that ask for it — the settings, where the vault is open,
+     * and the login screen, where it cannot be opened at all — because what it removes is the
+     * same in both cases and a second copy would be a second thing to keep in step with
+     * [VaultStorage.reset]. The phase is set here rather than left to a re-read: there is no
+     * vault to show afterwards, and the login screen is where a new one is made.
+     */
+    fun resetDevice() {
+        storage?.reset()
+        vault = null
+        message = masterKeyReset
+        phase = Phase.Login(LoginMode.FirstRun, null)
+    }
+
+    /**
      * Where a master key is written, or `null` when this machine has no platform key store.
      *
      * Read once and handed to the screens rather than read again by each of them: it is the
@@ -300,6 +318,11 @@ fun App(storage: VaultStorage?, settings: SettingsStore) {
                                     }
                                 },
                                 onUnlock = { scope.launch { openExisting() } },
+                                // The way out of the two states where this device holds
+                                // something it cannot use: the settings cannot be reached
+                                // without an open vault, and those states are exactly the ones
+                                // that have none.
+                                onReset = { resetDevice() },
                             )
 
                         Phase.Joining ->
@@ -367,16 +390,7 @@ fun App(storage: VaultStorage?, settings: SettingsStore) {
                                                     vault = imported
                                                     phase = Phase.Main(Tab.TwoFactor)
                                                 },
-                                                onReset = {
-                                                    // The reset removes what this device holds, so
-                                                    // the phase goes back to the first run: there
-                                                    // is no vault to show, and the login screen is
-                                                    // where a new one is made.
-                                                    storage?.reset()
-                                                    vault = null
-                                                    message = null
-                                                    phase = Phase.Login(LoginMode.FirstRun, null)
-                                                },
+                                                onReset = { resetDevice() },
                                             )
                                     }
                                 }

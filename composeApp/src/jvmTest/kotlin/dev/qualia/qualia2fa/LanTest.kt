@@ -84,7 +84,7 @@ class LanTest {
     /** The entry these tests move between devices. */
     private fun addEntry(vault: Vault): String =
         assertNotNull(
-            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, "", 1_700_000_000L),
+            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_000L),
             "adding an entry must succeed",
         )
 
