@@ -38,8 +38,8 @@ plugins {
 // it through a released version is not testing it at all. The registry stays the default,
 // checksum and all, so an ordinary build still builds exactly what crates.io serves under that
 // version number.
-val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.8")
-val ffiCrateSha256 = "37e7b6168bbb102d080ae7ed9aba86950a7af09922154605ae043ee487c5ab51"
+val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.1.9")
+val ffiCrateSha256 = "b35b31e274f4f30f5c2f7a4d8750a40ca4e89b2cd1bdc745f18521709636c1b3"
 val ffiLocalDir = providers.gradleProperty("qualia2fa.ffi.localDir").orNull
 val rustSourceDir = ffiLocalDir?.let { rootProject.file(it) } ?: layout.projectDirectory.dir("rust").asFile
 val rustManifest = rustSourceDir.resolve("Cargo.toml")
