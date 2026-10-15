@@ -1,6 +1,6 @@
 # Qualia2FA
 
-![Qualia2FA](composeApp/src/commonMain/composeResources/drawable/qualia2fa_logo.svg)
+![Qualia2FA](docs/qualia2fa_logo.svg)
 
 A **serverless, non-realtime** multi-platform two-factor authentication (2FA) app.
 
