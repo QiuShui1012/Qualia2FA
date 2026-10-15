@@ -382,7 +382,17 @@ jobs:
           if ($env:SIGNPATH_ARTIFACT_CONFIGURATION_SLUG) {
             $arguments.ArtifactConfigurationSlug = $env:SIGNPATH_ARTIFACT_CONFIGURATION_SLUG
           }
-          Submit-SigningRequest @arguments
+          # A failure here has to be readable without downloading a log archive, and the job log
+          # endpoint wants admin rights for an anonymous reader. The service's own message is the
+          # only thing that says *why* it refused, so it is emitted as an annotation.
+          try {
+            Submit-SigningRequest @arguments
+          } catch {
+            $message = $_.Exception.Message
+            if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $message = $_.ErrorDetails.Message }
+            Write-Host "::error::the signing request failed: $message"
+            throw
+          }
           Get-Item "$PWD/signed.zip" | ForEach-Object { Write-Host "signed archive: $($_.Length) bytes" }
           Expand-Archive -Path "$PWD/signed.zip" -DestinationPath "$PWD/signed" -Force
           Get-ChildItem "$PWD/signed" | ForEach-Object { Write-Host "  $($_.Name)" }
