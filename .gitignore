@@ -26,3 +26,10 @@ __pycache__/
 # IDE
 .idea/
 *.iml
+
+# The IDE draws this file as the project's icon, so it belongs in the repository.
+# Everything else in this directory is a local editor setting and stays out: a
+# directory-wide ignore would also exclude the icon, because git cannot re-include a
+# file whose parent directory is excluded.
+.idea/*
+!.idea/icon.svg
