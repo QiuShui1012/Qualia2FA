@@ -96,7 +96,7 @@ jobs:
             exit 1
           }
 
-      # MSI needs the WiX toolset and EXE needs Inno Setup; both are installed on the
+      # MSI needs the WiX toolset; the EXE is the same MSI wrapped in a small launcher, so it
       # runner. jlink builds the runtime image and jpackage the installers, so nothing
       # here needs a JDK on the machine that later runs the application.
       - name: Build the installers

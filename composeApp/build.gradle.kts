@@ -285,6 +285,11 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qualia2FA"
             packageVersion = "0.0.2"
+
+            // jpackage turns this into the page the installer shows before it copies anything.
+            // The packages are x64 and the application requires 64-bit Windows, and nothing in
+            // the installer said so: `Template` in the MSI is `x64;1033`, which a user never sees.
+            licenseFile.set(layout.projectDirectory.file("../packaging/install-notice.txt"))
             description = "Serverless, non-realtime two-factor authentication"
             vendor = "Qualia2FA"
 

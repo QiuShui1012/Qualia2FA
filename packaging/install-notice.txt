@@ -1,0 +1,9 @@
+Qualia2FA for Windows
+
+This installer installs a 64-bit (x64) build of the application and requires a 64-bit
+version of Windows. There is no 32-bit (x86) build: the bundled Java runtime and the
+application's own native library are both x86-64, and neither runs on a 32-bit system.
+
+Licensed under the GNU Lesser General Public License, version 3 or later. The complete
+source of this application and of the libraries it is built from is available at
+https://github.com/Qualia2FA
