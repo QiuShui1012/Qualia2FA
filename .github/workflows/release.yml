@@ -327,40 +327,46 @@ jobs:
           [IO.Compression.ZipFile]::OpenRead("$PWD/unsigned.zip").Entries |
             ForEach-Object { Write-Host "  $($_.FullName)" }
 
-      - name: Upload the unsigned installers as an artifact
-        id: unsigned
-        uses: actions/upload-artifact@v7
-        with:
-          name: Qualia2FA-${{ github.ref_name }}-unsigned
-          path: unsigned.zip
-          if-no-files-found: error
-          retention-days: 7
-
-      # The organization, project and policy identify this repository's SignPath project; the
-      # token belongs to a user who is a submitter for that signing policy. The artifact
-      # configuration is a repository variable rather than a literal here: the slug is a
-      # property of the SignPath project, and a copy of it in this file would be one more
-      # thing to keep in step. Leaving it empty uses the project's default configuration.
-      - name: Submit the signing request
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: "05949a10-8af0-4006-96b0-b1e7041d6831"
-          project-slug: "Qualia2FA"
-          signing-policy-slug: "Qualia2FA"
-          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
-          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed
-          # The action retries a failing service call for this long before it gives up, and a
-          # 503 is exactly that kind of failure: SignPath answered, and answered "unavailable".
-          # Ten minutes (the default) was not enough, and half an hour costs nothing when the
-          # service is healthy, because the retry loop ends with the first success.
-          service-unavailable-timeout-in-seconds: 1800
-          # The same reasoning for the wait itself: a signing policy may require an approval by
-          # a human, who is not at the keyboard at the moment the job reaches this step.
-          wait-for-completion-timeout-in-seconds: 1800
-
+      # The signing service is reached over its REST API rather than through the GitHub
+      # connector: the connector is a separate trusted build system that an organization has
+      # to allow, and until it is allowed every request fails at the login step. The API needs
+      # a token whose user is a submitter for the signing policy named below.
+      #
+      # The input is the zip the previous step built, because the artifact configuration
+      # describes a zip root: one request carries one artifact, and this is how both installers
+      # travel in it. The result comes back as a zip of the same shape, which the next step
+      # expands so the Release keeps the two installers separate.
+      - name: Sign the installers through the SignPath API
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+          Install-Module -Name SignPath -Scope CurrentUser -Force -AllowClobber
+          Import-Module SignPath
+          $arguments = @{
+            InputArtifactPath                     = "$PWD/unsigned.zip"
+            ApiToken                              = $env:SIGNPATH_API_TOKEN
+            OrganizationId                        = '05949a10-8af0-4006-96b0-b1e7041d6831'
+            ProjectSlug                           = 'Qualia2FA'
+            SigningPolicySlug                     = 'Qualia2FA'
+            OutputArtifactPath                    = "$PWD/signed.zip"
+            WaitForCompletion                     = $true
+            WaitForCompletionTimeoutInSeconds     = 1800
+            ServiceUnavailableTimeoutInSeconds    = 1800
+            Description                           = "Qualia2FA $env:GITHUB_REF_NAME from $env:GITHUB_SHA"
+          }
+          # Empty means "the project's default artifact configuration", which is what the
+          # signing request should use when the repository does not name one.
+          if ($env:SIGNPATH_ARTIFACT_CONFIGURATION_SLUG) {
+            $arguments.ArtifactConfigurationSlug = $env:SIGNPATH_ARTIFACT_CONFIGURATION_SLUG
+          }
+          Submit-SigningRequest @arguments
+          Get-Item "$PWD/signed.zip" | ForEach-Object { Write-Host "signed archive: $($_.Length) bytes" }
+          Expand-Archive -Path "$PWD/signed.zip" -DestinationPath "$PWD/signed" -Force
+          Get-ChildItem "$PWD/signed" | ForEach-Object { Write-Host "  $($_.Name)" }
       - name: Upload the installers
         shell: bash
         env:
