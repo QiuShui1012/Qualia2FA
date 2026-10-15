@@ -202,8 +202,8 @@ jobs:
 
           | Platform | Artifact | Notes |
           |---|---|---|
-          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the key the build was given; a debug-key signature installs and runs and is not an identity to publish under |
-          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | not code-signed, so SmartScreen warns on first run |
+          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the project's release key |
+          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | signed, with a certificate Windows does not trust yet: the installer will warn, and the signature is not an identity to rely on until the certificate comes from a trusted issuer |
 
           Nothing is synchronized in the background. The local-network half of pairing and
           syncing is opened while a screen that needs it is up, and the first pairing still
@@ -302,8 +302,8 @@ jobs:
 
           | Platform | Artifact | Notes |
           |---|---|---|
-          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the key the build was given; a debug-key signature installs and runs and is not an identity to publish under |
-          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | not code-signed, so SmartScreen warns on first run |
+          | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the project's release key |
+          | Windows 10/11 (x64) | `Qualia2FA-v<version>.msi`, `Qualia2FA-v<version>.exe` | signed, with a certificate Windows does not trust yet: the installer will warn, and the signature is not an identity to rely on until the certificate comes from a trusted issuer |
 
           Nothing is synchronized in the background. The local-network half of pairing and
           syncing is opened while a screen that needs it is up, and the first pairing still
