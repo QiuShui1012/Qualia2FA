@@ -162,29 +162,6 @@ jobs:
       - name: Make the Gradle wrapper executable
         run: chmod +x gradlew
 
-      # Windows scans every file a build writes, and the desktop packaging writes an enormous
-      # number of small ones: jlink assembles a runtime image and WiX authors the cabinet that
-      # contains it. Excluding the directories this job works in takes that scan off the
-      # critical path. The effect is printed either way -- a step that silently did nothing
-      # would be worse than no step at all, because the next reader would trust it.
-      - name: Exclude the build directories from Defender scanning
-        shell: pwsh
-        run: |
-          $paths = @("$env:GITHUB_WORKSPACE", "$env:USERPROFILE\.gradle", "$env:USERPROFILE\.cargo")
-          try {
-            foreach ($path in $paths) { Add-MpPreference -ExclusionPath $path -ErrorAction Stop }
-            Write-Host "Defender exclusions added."
-            (Get-MpPreference).ExclusionPath | ForEach-Object { Write-Host "  in effect: $_" }
-          } catch {
-            Write-Host "::warning::could not add Defender exclusions ($($_.Exception.Message)); the build continues and simply scans more files."
-          }
-      # The build sets `jvmToolchain(21)`, and the runner's default JDK is 17.
-      - name: Set up JDK 21
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
 
       # The device target only: the APK carries one Rust library, for `arm64-v8a`.
       - name: Set up the Rust toolchain
