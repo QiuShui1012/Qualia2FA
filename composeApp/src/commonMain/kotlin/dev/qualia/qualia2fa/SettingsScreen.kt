@@ -57,8 +57,7 @@ import dev.qualia.qualia2fa.resources.settings_key_store
 import dev.qualia.qualia2fa.resources.settings_language
 import dev.qualia.qualia2fa.resources.settings_license
 import dev.qualia.qualia2fa.resources.settings_lock_now
-import dev.qualia.qualia2fa.resources.settings_master_key_file
-import dev.qualia.qualia2fa.resources.settings_master_key_hardware
+import dev.qualia.qualia2fa.resources.settings_master_key_software
 import dev.qualia.qualia2fa.resources.settings_no_device_identity
 import dev.qualia.qualia2fa.resources.settings_recovery
 import dev.qualia.qualia2fa.resources.settings_recovery_explainer
@@ -117,8 +116,13 @@ private sealed interface ImportStep {
 @Composable
 fun SettingsScreen(
     vault: Vault,
-    storage: VaultStorage,
+    protection: MasterKeyProtection,
     identity: DeviceIdentity?,
+    /**
+     * Where an imported master key is written, or `null` on a machine with no platform key
+     * store — which is also a machine that cannot have reached this screen with a vault open.
+     */
+    masterKeyStore: MasterKeyStore?,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     onLock: () -> Unit,
@@ -156,13 +160,17 @@ fun SettingsScreen(
             LabeledValue(
                 label = stringResource(Res.string.settings_key_store),
                 value =
-                    stringResource(
-                        if (storage.masterKeyStore.isHardwareBacked) {
-                            Res.string.settings_master_key_hardware
-                        } else {
-                            Res.string.settings_master_key_file
-                        },
-                    ),
+                    if (protection.hardwareBacked) {
+                        // The name the platform store gives itself, next to what that name
+                        // means: "tpm · hardware protected" leaves the user nothing to guess
+                        // about which of the two protects the account.
+                        "${protection.backend} · ${stringResource(Res.string.settings_hardware_backed)}"
+                    } else {
+                        // Said the same way, because the backend is the fact and the sentence
+                        // is what it means: a software one is the operating system account and
+                        // nothing more.
+                        "${protection.backend} · ${stringResource(Res.string.settings_master_key_software)}"
+                    },
             )
             LabeledValue(
                 label = stringResource(Res.string.settings_device_identity),
@@ -324,7 +332,8 @@ fun SettingsScreen(
                 onDismiss = { importStep = null },
                 onConfirm = { passphrase ->
                     importStep = null
-                    val imported = Qualia.importRecoveryFile(step.file, passphrase, storage.masterKeyStore)
+                    val target = masterKeyStore
+                    val imported = target?.let { Qualia.importRecoveryFile(step.file, passphrase, it) }
                     if (imported == null) {
                         message = rejected
                     } else {

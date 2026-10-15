@@ -77,7 +77,7 @@ private sealed interface Phase {
  * they were resolved in the language that is no longer in effect.
  */
 @Composable
-fun App(storage: VaultStorage, settings: SettingsStore) {
+fun App(storage: VaultStorage?, settings: SettingsStore) {
     var language by remember { mutableStateOf(settings.language()) }
     var phase by remember { mutableStateOf<Phase>(Phase.Loading) }
     var vault by remember { mutableStateOf<Vault?>(null) }
@@ -142,12 +142,22 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
         phase = Phase.Loading
         val shown = TimeSource.Monotonic.markNow()
 
-        val store = storage.masterKeyStore
-        val data = storage.loadVault()
-        val hasKey = Qualia.hasMasterKey(store)
+        val device = storage
+        val store = device?.masterKeyStore
+        val data = device?.loadVault()
+        val hasKey = store != null && Qualia.hasMasterKey(store)
 
         val target =
             when {
+                // Nowhere to keep a master key: this machine has no platform key store that
+                // can hold a key-encryption key. Said out loud, because every action the
+                // login screen offers would fail on it.
+                device == null || store == null -> {
+                    vault = null
+                    message = noKeyStore
+                    Phase.Login(LoginMode.FirstRun, null)
+                }
+
                 // Nothing here at all: the first run. This is the only state in which creating a
                 // vault is safe, because there is no master key to replace.
                 data == null && !hasKey -> {
@@ -155,11 +165,11 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                     Phase.Login(LoginMode.FirstRun, null)
                 }
 
-                // A vault file whose master key is gone. The key store's entry can be lost — on
-                // Android the wrapping key is not backed up and anything that resets the device's
-                // credentials takes it with them — and what is left can never be opened again.
-                // Reporting the first run here would invite the user to create a vault over the
-                // one they still have.
+                // A vault file whose master key is gone. The wrapped bytes may be there and no
+                // longer unwrap — the platform key that protected them is lost by a hardware
+                // reset, a restored backup or a reset of this device's credentials — and what is
+                // left can never be opened again. Reporting the first run here would invite the
+                // user to create a vault over the one they still have.
                 !hasKey -> {
                     vault = null
                     Phase.Login(LoginMode.Unreadable, null)
@@ -197,6 +207,15 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
         clipboard.setText(AnnotatedString(""))
     }
 
+    /**
+     * Where a master key is written, or `null` when this machine has no platform key store.
+     *
+     * Read once and handed to the screens rather than read again by each of them: it is the
+     * same store for the life of this composition, and a machine without one is a state the
+     * login screen says out loud instead of offering actions that would fail.
+     */
+    val store = storage?.masterKeyStore
+
     LaunchedEffect(Unit) { openExisting() }
 
     LaunchedEffect(phase) {
@@ -208,6 +227,17 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
     // Read once per vault: opening the platform identity is a key store access, and a
     // hardware one on the machines that have it.
     val identity = remember(vault) { vault?.let { Qualia.deviceIdentity(DEVICE_LABEL) } }
+
+    // What protects the master key, as the platform store reports it rather than as this
+    // build assumes: the first-run warning follows the answer. It comes from the store, so a
+    // machine whose store cannot hold a key-encryption key is reported as unprotected — which
+    // is what the user is being asked to accept, and what every action on that screen fails
+    // on anyway.
+    val protection =
+        remember(store) {
+            store?.let { MasterKeyProtection(it.backend, it.isHardwareBacked) }
+                ?: MasterKeyProtection(backend = "unavailable", hardwareBacked = false)
+        }
 
     CompositionLocalProvider(
         LocalAppLocale provides language.tag,
@@ -223,43 +253,51 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                             LoginScreen(
                                 mode = current.mode,
                                 reason = current.reason,
-                                hardwareBacked = storage.masterKeyStore.isHardwareBacked,
+                                hardwareBacked = protection.hardwareBacked,
                                 message = message,
                                 language = language,
                                 onSelectLanguage = selectLanguage,
                                 onCreateVault = {
-                                    val store = storage.masterKeyStore
-                                    val registration = Qualia.register(store, DEVICE_LABEL)
-                                    if (registration != null) {
-                                        val data = registration.vault.serialize()
-                                        if (data == null) {
-                                            message = serializeFailed
-                                        } else {
-                                            storage.saveVault(data)
-                                            vault = registration.vault
-                                            message = null
-                                            phase = Phase.Main(Tab.TwoFactor)
-                                        }
+                                    val device = storage
+                                    if (device == null || store == null) {
+                                        message = noKeyStore
                                     } else {
-                                        // The platform key store holds the device identity, and
-                                        // without it this device cannot pair or sync. A local
-                                        // vault is still useful, but it is a different thing and
-                                        // the settings screen says so.
-                                        val created = Qualia.createLocalVault(store)
-                                        val data = created?.serialize()
-                                        if (created == null || data == null) {
-                                            message = noKeyStore
+                                        val registration = Qualia.register(store, DEVICE_LABEL)
+                                        if (registration != null) {
+                                            val data = registration.vault.serialize()
+                                            if (data == null) {
+                                                message = serializeFailed
+                                            } else {
+                                                device.saveVault(data)
+                                                vault = registration.vault
+                                                message = null
+                                                phase = Phase.Main(Tab.TwoFactor)
+                                            }
                                         } else {
-                                            storage.saveVault(data)
-                                            vault = created
-                                            message = null
-                                            phase = Phase.Main(Tab.TwoFactor)
+                                            // The platform key store holds the device identity, and
+                                            // without it this device cannot pair or sync. A local
+                                            // vault is still useful, but it is a different thing and
+                                            // the settings screen says so.
+                                            val created = Qualia.createLocalVault(store)
+                                            val data = created?.serialize()
+                                            if (created == null || data == null) {
+                                                message = noKeyStore
+                                            } else {
+                                                device.saveVault(data)
+                                                vault = created
+                                                message = null
+                                                phase = Phase.Main(Tab.TwoFactor)
+                                            }
                                         }
                                     }
                                 },
                                 onJoin = {
-                                    message = null
-                                    phase = Phase.Joining
+                                    if (storage == null || store == null) {
+                                        message = noKeyStore
+                                    } else {
+                                        message = null
+                                        phase = Phase.Joining
+                                    }
                                 },
                                 onUnlock = { scope.launch { openExisting() } },
                             )
@@ -298,21 +336,26 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                                         Tab.TwoFactor ->
                                             TwoFactorScreen(
                                                 vault = currentVault,
-                                                onPersist = { currentVault.serialize()?.let(storage::saveVault) },
+                                                onPersist = {
+                                                    currentVault.serialize()?.let { storage?.saveVault(it) }
+                                                },
                                             )
 
                                         Tab.Sync ->
                                             SyncScreen(
                                                 vault = currentVault,
                                                 deviceId = identity?.id,
-                                                onChanged = { currentVault.serialize()?.let(storage::saveVault) },
+                                                onChanged = {
+                                                    currentVault.serialize()?.let { storage?.saveVault(it) }
+                                                },
                                             )
 
                                         Tab.Settings ->
                                             SettingsScreen(
                                                 vault = currentVault,
-                                                storage = storage,
+                                                protection = protection,
                                                 identity = identity,
+                                                masterKeyStore = store,
                                                 language = language,
                                                 onSelectLanguage = selectLanguage,
                                                 onLock = { lock(Status.Locked) },
@@ -320,7 +363,7 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                                                     // The account changed under this device: the
                                                     // file on disk belongs to the old one, so the
                                                     // new vault is written before anything reads it.
-                                                    imported.serialize()?.let(storage::saveVault)
+                                                    imported.serialize()?.let { storage?.saveVault(it) }
                                                     vault = imported
                                                     phase = Phase.Main(Tab.TwoFactor)
                                                 },
@@ -329,7 +372,7 @@ fun App(storage: VaultStorage, settings: SettingsStore) {
                                                     // the phase goes back to the first run: there
                                                     // is no vault to show, and the login screen is
                                                     // where a new one is made.
-                                                    storage.reset()
+                                                    storage?.reset()
                                                     vault = null
                                                     message = null
                                                     phase = Phase.Login(LoginMode.FirstRun, null)

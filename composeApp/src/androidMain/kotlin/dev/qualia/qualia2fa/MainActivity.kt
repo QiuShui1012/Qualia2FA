@@ -22,8 +22,9 @@ import java.nio.file.Path
  * # Where the files live
  *
  * [android.content.Context.getFilesDir] is the application's own private directory: no other
- * application can read it, and it is removed when this one is uninstalled. The master key
- * itself is wrapped by a key in the platform keystore, which never leaves it.
+ * application can read it, and it is removed when this one is uninstalled. What is written
+ * there for the master key is the wrapped form; the key that can unwrap it is a keystore
+ * entry, which never leaves the keystore.
  *
  * # The window
  *
@@ -71,15 +72,10 @@ class MainActivity : ComponentActivity() {
                         .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
             ) {
                 App(
-                    storage =
-                        FileVaultStorage(
-                            dataDirectory = dataDirectory,
-                            masterKeyStore =
-                                AndroidKeystoreMasterKeyStore(
-                                    path = dataDirectory.resolve("master.key"),
-                                    context = this@MainActivity,
-                                ),
-                        ),
+                    // Both platforms reach the master key the same way: the key-encryption
+                    // key lives in this device's platform key store, and what is written
+                    // beside the vault file is the wrapped form.
+                    storage = FileVaultStorage.open(dataDirectory),
                     settings = FileSettingsStore(dataDirectory.resolve("settings.properties")),
                 )
             }

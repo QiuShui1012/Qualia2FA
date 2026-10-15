@@ -77,10 +77,15 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 fun JoinAccountScreen(
-    storage: VaultStorage,
+    storage: VaultStorage?,
     onJoined: (Vault) -> Unit,
     onCancel: () -> Unit,
 ) {
+    /**
+     * Where the transferred master key is written, or `null` when this machine has no platform
+     * key store — which the login screen reports before it ever offers this route.
+     */
+    val store = storage?.masterKeyStore
     var payload by remember { mutableStateOf("") }
     var joiner by remember { mutableStateOf<PairingJoiner?>(null) }
     var requestText by remember { mutableStateOf<String?>(null) }
@@ -169,7 +174,13 @@ fun JoinAccountScreen(
                             return@launch
                         }
 
-                        val joined = current.complete(answer.message, storage.masterKeyStore)
+                        val target = store
+                        val device = storage
+                        if (target == null || device == null) {
+                            message = replyRejected
+                            return@launch
+                        }
+                        val joined = current.complete(answer.message, target)
                         if (joined == null) {
                             message = replyRejected
                             return@launch
@@ -179,7 +190,7 @@ fun JoinAccountScreen(
                             message = notSerialized
                             return@launch
                         }
-                        storage.saveVault(data)
+                        device.saveVault(data)
                         onJoined(joined)
                     } finally {
                         lanStage = null
@@ -258,15 +269,17 @@ fun JoinAccountScreen(
                 Button(
                     onClick = {
                         val current = joiner
-                        val joined = current?.completeText(replyText.trim(), storage.masterKeyStore)
-                        if (joined == null) {
+                        val target = store
+                        val device = storage
+                        if (current == null || target == null || device == null) {
                             message = replyRejected
                         } else {
-                            val data = joined.serialize()
-                            if (data == null) {
-                                message = notSerialized
+                            val joined = current.completeText(replyText.trim(), target)
+                            val data = joined?.serialize()
+                            if (joined == null || data == null) {
+                                message = replyRejected
                             } else {
-                                storage.saveVault(data)
+                                device.saveVault(data)
                                 onJoined(joined)
                             }
                         }

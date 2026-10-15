@@ -29,7 +29,7 @@
     <string name="action_join_existing_account">Log in to an existing account</string>
     <string name="action_unlock">Unlock</string>
     <string name="first_run_intro">There is no vault on this device yet. Creating one keeps the entries here, and the codes are computed offline.</string>
-    <string name="first_run_no_hardware_warning">Note: this machine has no platform key store, so the master key will be written to a file that only your operating system account can read. Continuing means you accept that; TPM support is not wired in yet.</string>
+    <string name="first_run_no_hardware_warning">Note: this machine has no hardware key store, so the key that protects the master key is a software one that only your operating system account protects. Continuing means you accept that.</string>
     <string name="first_run_join_explainer">Logging in takes the master key from a device that is already unlocked: that device shows a code, this one turns it into a request, and the reply comes back after the other side confirms. The master key travels out of band, through the code, and never through a server.</string>
     <string name="login_locked_explainer">The vault is locked. Unlocking takes the master key out of the platform key store again; there is no password to type.</string>
     <string name="login_key_unreadable">This device holds a master key that cannot be read right now. Creating a new vault here would replace it and its entries would be lost, so do not do that before trying the recovery key on another device.</string>
@@ -219,8 +219,7 @@
     <string name="settings_language">Language</string>
     <string name="language_system">Follow the system language</string>
     <string name="settings_key_store">Master key</string>
-    <string name="settings_master_key_hardware">In the platform key store, hardware protected</string>
-    <string name="settings_master_key_file">In a file on this device, protected by your operating system account only</string>
+    <string name="settings_master_key_software">In the platform key store, software protected: only your operating system account protects it</string>
     <string name="settings_device_identity">Device identity</string>
     <string name="settings_no_device_identity">None: this vault cannot pair or sync</string>
     <string name="settings_hardware_backed">hardware protected</string>

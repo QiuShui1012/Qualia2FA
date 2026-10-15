@@ -30,8 +30,11 @@ fun main() = application {
         title = "Qualia2FA",
         icon = painterResource(Res.drawable.qualia2fa_logo),
     ) {
+        // The master key is wrapped by a key the platform key store holds, so the storage is
+        // opened rather than constructed: a machine with no such store has nowhere to keep a
+        // master key, and the application says so instead of pretending.
         App(
-            storage = FileVaultStorage(AppPaths.dataDirectory),
+            storage = remember { FileVaultStorage.open(AppPaths.dataDirectory) },
             settings = remember { FileSettingsStore(AppPaths.settingsFile) },
         )
     }

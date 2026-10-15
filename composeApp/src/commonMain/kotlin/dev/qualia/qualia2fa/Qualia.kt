@@ -24,6 +24,7 @@ import dev.qualia.qualia2fa.ffi.FfiSyncOutcome
 import dev.qualia.qualia2fa.ffi.FfiSyncSession
 import dev.qualia.qualia2fa.ffi.FfiTransport
 import dev.qualia.qualia2fa.ffi.FfiTransportCapabilities
+import dev.qualia.qualia2fa.ffi.FfiWrappedMasterKeyStore
 import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
 import dev.qualia.qualia2fa.ffi.qrDecodeText as ffiQrDecodeText
 import dev.qualia.qualia2fa.ffi.qrEncodeFrames as ffiQrEncodeFrames
@@ -43,12 +44,26 @@ import kotlin.time.TimeSource
 /**
  * Where the master key is kept.
  *
- * This is the facade's own interface, not the generated one: the application implements
- * it with a file, and a platform store will replace that later. [isHardwareBacked] must
- * be answered truthfully, because the user interface asks for consent when it is false.
+ * This is the facade's own interface, not the generated one: what implements it is
+ * [WrappedMasterKeyStore], which is the platform key store of `qualia-dik` behind this
+ * facade's types, opened through [openWrappedMasterKeyStore].
+ *
+ * # The material is written and read as bytes, and persists as something else
+ *
+ * The core takes the master key as its 32 bytes, so [load] and [store] exchange bytes and
+ * nothing else. What the implementation *persists* is its own business: the wrapped form
+ * keeps a key-encryption key in the platform key store and writes only the bytes that key
+ * produced, so a copy of the file is not a copy of the vault's key.
+ *
+ * # `null` means "nothing to read"
+ *
+ * [load] answers `null` when this device holds no master key, whether because it was never
+ * registered or because what was persisted can no longer be unwrapped. Both are states the
+ * user interface reports; neither is worth an exception, and the caller cannot tell them
+ * apart from a successful read that happens to be `null`.
  */
 interface MasterKeyStore {
-    /** The 32-byte master key, or `null` when this device was never registered. */
+    /** The 32-byte master key, or `null` when this device has none to read. */
     fun load(): ByteArray?
 
     /**
@@ -62,8 +77,31 @@ interface MasterKeyStore {
     /** Deletes the master key; deleting a missing key is not an error. */
     fun delete()
 
-    /** Whether the store is backed by hardware (TPM, Secure Enclave, Android Keystore). */
+    /**
+     * Whether a master key has been persisted here.
+     *
+     * A read of what is on this device, not of the platform store: opening the key store to
+     * unwrap a key that is not there would be a hardware call to answer a question about a
+     * file, and the answer would be the same.
+     */
+    val exists: Boolean
+
+    /**
+     * Whether the key that protects the master key cannot leave hardware.
+     *
+     * **Must be answered truthfully**, because the user interface asks for consent when it
+     * is false.
+     */
     val isHardwareBacked: Boolean
+
+    /**
+     * The platform key store that answered, as the library names it: `"tpm"`,
+     * `"android-keystore"`, `"software"` or `"secure-enclave"`.
+     *
+     * Reported as it is, and only read for the user interface: which backend protects the
+     * account is something the user is entitled to know.
+     */
+    val backend: String
 }
 
 /**
@@ -421,8 +459,13 @@ object Qualia {
             null
         }
 
-    /** Whether this device already holds a master key. */
-    fun hasMasterKey(store: MasterKeyStore): Boolean = store.load() != null
+    /**
+     * Whether this device already holds a master key.
+     *
+     * Read from what is persisted, not by unwrapping it: the two answers differ only when
+     * the key can no longer be read, and that case is decided by opening the vault.
+     */
+    fun hasMasterKey(store: MasterKeyStore): Boolean = store.exists
 
     /**
      * Registers this device: generates the master key, creates the device identity in the
@@ -1420,6 +1463,134 @@ data class OtpAuthLink(
     val digits: Int,
     val periodSeconds: Long,
 )
+
+/**
+ * The master key store of the wrapped form: a key-encryption key in the platform key store,
+ * and wrapped bytes as the only thing the application persists.
+ *
+ * # What the application keeps, and what it does not
+ *
+ * [store] hands the master key to the platform and receives bytes back; those bytes are what
+ * belongs next to the vault file, and the platform store never hands out the key-encryption
+ * key that produced them. [load] gives the bytes back so the platform can unwrap them, which
+ * is how the master key is read again.
+ *
+ * # The label
+ *
+ * One label names one entry in the platform key store, and the entry is created on first
+ * wrap. Every operation of one device has to use the same label: a different one produces a
+ * different key-encryption key, and bytes wrapped under the first do not unwrap under it.
+ * The label is taken once by the constructor rather than passed to every call, so one store
+ * cannot be used against two entries by accident.
+ *
+ * # [load] returns material the caller owns
+ *
+ * What it answers with is the master key in the clear. The caller wipes it as soon as the
+ * vault holds its own copy, exactly as it does for the bytes [store] was given.
+ */
+abstract class WrappedMasterKeyStore internal constructor(
+    private val inner: FfiWrappedMasterKeyStore,
+    private val label: String,
+) : MasterKeyStore {
+    /**
+     * The wrapped bytes as the platform store last produced them, or `null` when this device
+     * holds none.
+     *
+     * Never the master key: the platform's key is what these bytes still need, which is why
+     * they may be persisted at all. How they are kept is the subclass's business, and it is
+     * read on every access rather than cached, so that a write made elsewhere is not
+     * contradicted by a copy taken once.
+     */
+    protected abstract val wrappedBytes: ByteArray?
+
+    /**
+     * Persists the wrapped bytes the platform just produced.
+     *
+     * [bytes] is never empty: the platform either wraps the key or fails, and a failure is
+     * reported as an exception to the caller of [store].
+     */
+    protected abstract fun persist(bytes: ByteArray)
+
+    /**
+     * Removes what keeps the wrapped bytes usable.
+     *
+     * Called by [delete] before [persist]'s counterpart removes the bytes themselves, so that
+     * an interrupted delete leaves nothing anybody could still unwrap.
+     */
+    protected open fun deletePersisted() = Unit
+
+    final override fun load(): ByteArray? {
+        val wrapped = wrappedBytes ?: return null
+        return try {
+            inner.load(label, wrapped)
+        } catch (_: Exception) {
+            // Nothing the platform can unwrap: reading is what fails, and only reading. No
+            // exception escapes, because "this device can no longer open its vault" is a
+            // state the user interface reports rather than an error to crash on.
+            null
+        }
+    }
+
+    final override fun store(key: ByteArray) {
+        require(key.size == MASTER_KEY_BYTES) {
+            "the master key is $MASTER_KEY_BYTES bytes, got ${key.size}"
+        }
+        persist(inner.store(label, key))
+    }
+
+    final override fun delete() {
+        // The key-encryption key goes first: an interrupted delete then leaves bytes that
+        // nothing can unwrap, which is the state a device reports as never registered. The
+        // other order would leave a working key behind an application that believes it
+        // removed the master key.
+        runCatching { inner.delete(label) }
+        runCatching { deletePersisted() }
+    }
+
+    /**
+     * Whether the wrapped bytes are still there.
+     *
+     * A cheap question, deliberately: what it answers is "this device has been registered",
+     * which is what the user interface branches on before it tries to open a vault. Whether
+     * they still unwrap is answered by [load], which costs a platform key operation.
+     */
+    final override val exists: Boolean get() = wrappedBytes != null
+
+    final override val isHardwareBacked: Boolean get() = inner.isHardwareBacked()
+
+    final override val backend: String get() = inner.backend()
+
+    private companion object {
+        /** Passthrough of the library's length, so the two sides cannot disagree about it. */
+        val MASTER_KEY_BYTES: Int
+            get() = Qualia.MASTER_KEY_BYTES
+    }
+}
+
+/**
+ * Opens the platform store of the wrapped form under [label], whatever this machine holds.
+ *
+ * The result is `null` when the native library cannot open a store at all — a machine with
+ * nothing that can hold a key-encryption key — which is a state the user interface reports
+ * rather than an error to crash on. Every other failure arrives from the operations, where
+ * there is a caller that can say what failed.
+ *
+ * Opening creates nothing: the key-encryption key of a label is made when the first master
+ * key is wrapped under it, and the same label always names the same one. A device therefore
+ * uses one label for its master key and passes it here once.
+ *
+ * The result is the generated object rather than a [MasterKeyStore], and it is handed to a
+ * subclass of one: the type does not leave this file, so the binding layer stays behind the
+ * facade the way every other generated type does.
+ */
+internal fun openWrappedMasterKeyStore(label: String): FfiWrappedMasterKeyStore? =
+    // Aliased, like every generated name this file uses, so that the call can never resolve
+    // to a wrapper around itself.
+    try {
+        FfiWrappedMasterKeyStore.open()
+    } catch (_: Exception) {
+        null
+    }
 
 /**
  * Adapts the facade's store interface to the one the binding layer expects.

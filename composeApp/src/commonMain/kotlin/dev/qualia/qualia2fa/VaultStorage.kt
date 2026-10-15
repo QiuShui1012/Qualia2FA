@@ -26,6 +26,24 @@ interface VaultStorage {
      */
     fun reset()
 
-    /** The master key store of this device. */
-    val masterKeyStore: MasterKeyStore
+    /**
+     * The master key store of this device, or `null` when this machine has none.
+     *
+     * `null` is a machine whose platform key store cannot hold a key-encryption key: there is
+     * nowhere to keep a master key, so there is nothing to register and nothing to unlock. The
+     * user interface says so rather than offering a vault that could never be opened again.
+     */
+    val masterKeyStore: MasterKeyStore?
 }
+
+/**
+ * What protects the master key, as the login and settings screens show it.
+ *
+ * [backend] is the platform key store's own name for itself — `"tpm"`, `"android-keystore"`,
+ * `"software"`, `"secure-enclave"` — and [hardwareBacked] says whether that name is hardware
+ * protection. Both are reported as they are, because the user is being asked to trust them.
+ */
+data class MasterKeyProtection(
+    val backend: String,
+    val hardwareBacked: Boolean,
+)

@@ -22,7 +22,7 @@
     <string name="action_join_existing_account">登录到已有账号</string>
     <string name="action_unlock">解锁</string>
     <string name="first_run_intro">这台设备上还没有保险库。创建之后，条目只保存在本机，验证码离线可算。</string>
-    <string name="first_run_no_hardware_warning">注意：本机没有接上硬件密钥库，主密钥将写在一个只有你的操作系统账户能读的文件里。继续即表示你接受这一点；TPM 支持尚未接上。</string>
+    <string name="first_run_no_hardware_warning">注意：本机没有硬件密钥库，保护主密钥的是一把软件密钥，只有你的操作系统账户在保护它。继续即表示你接受这一点。</string>
     <string name="first_run_join_explainer">登录会从一台已解锁的设备取得主密钥：那台设备显示一个码，本机用它生成请求，对方确认后把应答交回来。主密钥由这个码带外传递，不经过任何服务器。</string>
     <string name="login_locked_explainer">保险库已锁定。解锁会重新从平台密钥库取出主密钥，不需要输入任何密码。</string>
     <string name="login_key_unreadable">这台设备上有一把现在读不出来的主密钥。在这里创建新保险库会顶掉它，里面的条目会一起丢失——先试试在另一台设备上用恢复密钥。</string>
@@ -212,8 +212,7 @@
     <string name="settings_language">语言</string>
     <string name="language_system">跟随系统语言</string>
     <string name="settings_key_store">主密钥</string>
-    <string name="settings_master_key_hardware">在平台密钥库中，受硬件保护</string>
-    <string name="settings_master_key_file">在本机文件里，仅由你的操作系统账户保护</string>
+    <string name="settings_master_key_software">在平台密钥库中，受软件保护：只有你的操作系统账户在保护它</string>
     <string name="settings_device_identity">设备身份</string>
     <string name="settings_no_device_identity">没有：这个保险库不能配对或同步</string>
     <string name="settings_hardware_backed">硬件保护</string>

@@ -38,10 +38,12 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 - **The main screens**: 2FA, sync and settings share one navigation — a rail down the left
   in landscape, a bar across the bottom in portrait, with the current screen highlighted —
   and every screen rearranges itself for the window it is in
-- **First run**: create a vault (the device identity and the master key go to the platform
-  key store, which is reported as it is — TPM or software), or log in by pairing with a
-  device that is already unlocked. A device that already holds a master key is only offered
-  unlocking and logging in: creating a vault there would replace that key
+- **First run**: create a vault (the device identity goes to the platform key store, and the
+  master key is protected by a key the platform key store holds and never hands out, so what
+  is written beside the vault file is the **wrapped** form; the store is reported as it is —
+  TPM, Android Keystore or software), or log in by pairing with a device that is already
+  unlocked. A device that already holds a master key is only offered unlocking and logging in:
+  creating a vault there would replace that key
 - **Entries**: add, edit and delete by hand, import one from an `otpauth://` QR code in an
   image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
   because the tombstone reaches every device the account syncs with
@@ -133,13 +135,21 @@ composeApp/
 │       ├── Layout.kt           What each window size shows, written as pure functions so they can be tested
 │       ├── Theme.kt            Colours, corners and spacing: the palette is the mark's own (#EAF2F4 and #091012)
 │       └── *Screen.kt          Loading, login, 2FA, sync, settings, and both sides of pairing
-├── src/jvmMain/                Desktop implementation: file storage, file dialogs, the window and locking on focus loss
+├── src/androidJvmMain/         What the desktop and Android builds share: the vault file, and the wrapped master key beside it
+├── src/jvmMain/                Desktop implementation: the data directory, file dialogs, the window
+├── src/androidMain/            Android implementation: the activity, the camera, the file picker
 └── src/jvmTest/                Unit tests
 ```
 
 `Qualia.kt` is the only file in the repository that imports the generated bindings: the UI
 sees ordinary Kotlin values, so replacing, patching or forking the binding layer touches that
-one file.
+one file. The two features that must not cross that line — the entry list, and where the
+master key is kept — are wrapped there as well.
+
+The master key itself is never written anywhere: a key-encryption key is generated inside the
+platform key store, never leaves it, and what the data directory holds is the bytes it
+produced. Copying that file therefore does not copy the account, and the settings screen
+reports which backend answered — `tpm`, `android-keystore` or `software`.
 
 `icons/` holds the `.ico` used for packaging (the Windows installer and the window icon); it
 is regenerated from the mark by `icons/make_ico.py`.
