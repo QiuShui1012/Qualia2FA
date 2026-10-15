@@ -358,13 +358,19 @@ jobs:
           SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
         run: |
           $ErrorActionPreference = 'Stop'
-          # The gallery needs its NuGet provider before it can install anything, and asking for
-          # it interactively is how this step fails on a runner: there is nobody to answer the
-          # prompt. Installing it up front, and trusting the gallery, keeps the step silent.
-          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.1.201 -Force -Scope CurrentUser | Out-Null
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction SilentlyContinue
-          Install-Module -Name SignPath -Scope CurrentUser -Force -AllowClobber
+          # Which command installs the module depends on which PowerShellGet the runner has, and
+          # the difference is not cosmetic: PowerShell 7 ships PowerShellGet v3, whose
+          # `Install-PSResource` needs no NuGet provider at all, while the older `Install-Module`
+          # path needs one -- and asking for that provider interactively is how the step fails on
+          # a runner, where there is nobody to answer the prompt. Both are tried, newest first.
+          if (Get-Command Install-PSResource -ErrorAction SilentlyContinue) {
+            Install-PSResource -Name SignPath -Scope CurrentUser -TrustRepository -Quiet
+          } else {
+            try { Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction SilentlyContinue } catch { }
+            Install-Module -Name SignPath -Scope CurrentUser -Force -AllowClobber
+          }
           Import-Module SignPath
+          Get-Command Submit-SigningRequest | ForEach-Object { Write-Host "cmdlet available: $($_.Name) from $($_.Source)" }
           $arguments = @{
             InputArtifactPath                     = "$PWD/unsigned.zip"
             ApiToken                              = $env:SIGNPATH_API_TOKEN
