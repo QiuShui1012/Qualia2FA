@@ -36,11 +36,15 @@
 -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <zip-file>
-    <pe-file
-      path="Qualia2FA-v*.exe"
-      product-name="Qualia2FA"
-      company-name="Qualia2FA"
-      copyright="Copyright (c) Qualia2FA contributors">
+    <!--
+      No `product-name` / `company-name` / `copyright` here, deliberately. Those attributes are
+      restrictions, not decorations: the service compares them against the version resource
+      inside the file and refuses the request when they differ, which is what happened when this
+      element claimed `Qualia2FA` while jpackage had named the installer `Qualia2FA Installer`.
+      A restriction is worth having only once its value has been read from a real artifact;
+      what a file says about itself should come from the file.
+    -->
+    <pe-file path="Qualia2FA-v*.exe">
       <authenticode-sign />
     </pe-file>
 
