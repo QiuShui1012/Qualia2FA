@@ -71,8 +71,7 @@ class AlgorithmTest {
                         secretBase32 = base32(secret.toByteArray(Charsets.US_ASCII)),
                         algorithm = algorithm,
                         digits = 8,
-                        periodSeconds = 30,
-                        counter = null,
+                        kind = EntryKind.Totp(30),
                         note = "",
                         unixTime = 59,
                     ),
@@ -107,8 +106,7 @@ class AlgorithmTest {
                             secretBase32 = secret,
                             algorithm = algorithm,
                             digits = 8,
-                            periodSeconds = 30,
-                            counter = null,
+                            kind = EntryKind.Totp(30),
                             note = "",
                             unixTime = 59,
                         ),
@@ -154,8 +152,7 @@ class AlgorithmTest {
                     secretBase32 = link.secretBase32,
                     algorithm = link.algorithm,
                     digits = link.digits,
-                    periodSeconds = link.periodSeconds,
-                    counter = null,
+                    kind = link.kind,
                     note = "",
                     unixTime = 1_700_000_000,
                 ),
@@ -219,8 +216,7 @@ class AlgorithmTest {
                     secretBase32 = "JBSWY3DPEHPK3PXP",
                     algorithm = OtpAlgorithm.Sha1,
                     digits = 7,
-                    periodSeconds = 30,
-                    counter = null,
+                    kind = EntryKind.Totp(30),
                     note = "",
                     unixTime = 59,
                 ),
@@ -231,7 +227,32 @@ class AlgorithmTest {
         assertEquals(7, stored.digits, "the digit count must survive the vault")
         assertEquals(7, assertNotNull(vault.code(id, 59), "a seven-digit code").length)
 
-        for (unsupported in listOf(0, 5, 9, 12)) {
+        // Five and nine are counts the core produces, so they are carried rather than refused.
+        for (carried in listOf(5, 9)) {
+            val carriedId =
+                assertNotNull(
+                    vault.addEntry(
+                        name = "Carried",
+                        issuer = "Qualia",
+                        account = "test",
+                        secretBase32 = "JBSWY3DPEHPK3PXP",
+                        algorithm = OtpAlgorithm.Sha1,
+                        digits = carried,
+                        kind = EntryKind.Totp(30),
+                        note = "",
+                        unixTime = 59,
+                    ),
+                    "$carried digits must be accepted",
+                )
+            val carriedEntry = assertNotNull(vault.entries().firstOrNull { it.id == carriedId })
+            assertEquals(carried, carriedEntry.digits, "a $carried-digit count must survive the vault")
+            assertEquals(
+                carried,
+                assertNotNull(vault.code(carriedId, 59), "$carried-digit code").length,
+            )
+        }
+
+        for (unsupported in listOf(0, 10, 12)) {
             assertEquals(
                 null,
                 vault.addEntry(
@@ -241,8 +262,7 @@ class AlgorithmTest {
                     secretBase32 = "JBSWY3DPEHPK3PXP",
                     algorithm = OtpAlgorithm.Sha1,
                     digits = unsupported,
-                    periodSeconds = 30,
-                    counter = null,
+                    kind = EntryKind.Totp(30),
                     note = "",
                     unixTime = 59,
                 ),

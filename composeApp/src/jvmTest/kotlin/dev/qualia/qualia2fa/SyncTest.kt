@@ -45,7 +45,7 @@ class SyncTest {
     /** The entry these tests move between devices, written at the instant they all start from. */
     private fun addEntry(vault: Vault, updatedAt: Long = 1_700_000_000L): String =
         assertNotNull(
-            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", updatedAt),
+            vault.addEntry("GitHub", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, EntryKind.Totp(30), "", updatedAt),
             "adding an entry must succeed",
         )
 
@@ -101,7 +101,7 @@ class SyncTest {
 
         val edited = 1_700_000_120L
         assertTrue(
-            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", edited),
+            vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, EntryKind.Totp(30), "", edited),
             "the edit must be accepted",
         )
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L), "the deletion must be accepted")
@@ -111,7 +111,9 @@ class SyncTest {
         assertEquals(0, outcome.deletionsApplied, "nothing may be deleted before the user decides")
         assertEquals(1, vaultB.entryCount, "the entry is still there")
 
-        val conflict = outcome.conflicts.single()
+        // The top group's arrangement is a conflict of its own when two devices have arranged it,
+        // so the entry conflict is picked out by kind rather than assumed to be the only one.
+        val conflict = outcome.conflicts.single { it.kind == SyncConflictKind.PeerDeleted }
         assertEquals(SyncConflictKind.PeerDeleted, conflict.kind)
         assertEquals(id, conflict.entryId)
         assertEquals("GitHub (work)", assertNotNull(conflict.local, "the local version is shown").name)
@@ -139,7 +141,9 @@ class SyncTest {
 
         val outcome = merge(sessionB, assertNotNull(sessionA.myCodeText()))
         assertTrue(outcome.needsAdjudication, "$outcome")
-        val conflict = outcome.conflicts.single()
+        // The top group's arrangement is a conflict of its own when two devices have arranged it,
+        // so the entry conflict is picked out by kind rather than assumed to be the only one.
+        val conflict = outcome.conflicts.single { it.kind == SyncConflictKind.LocalDeleted }
         assertEquals(SyncConflictKind.LocalDeleted, conflict.kind)
         assertNull(conflict.local, "this device holds only a deletion")
         assertEquals("GitHub", assertNotNull(conflict.incoming, "the other device's entry is shown").name)
@@ -162,7 +166,7 @@ class SyncTest {
         val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 
-        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, 30, null, "", 1_700_000_120L))
+        assertTrue(vaultB.updateEntry(id, "GitHub (work)", "ACME", "alice", secret, OtpAlgorithm.Sha1, 6, EntryKind.Totp(30), "", 1_700_000_120L))
         assertTrue(vaultA.removeEntry(id, 1_700_000_060L))
         merge(sessionB, assertNotNull(sessionA.myCodeText()))
 

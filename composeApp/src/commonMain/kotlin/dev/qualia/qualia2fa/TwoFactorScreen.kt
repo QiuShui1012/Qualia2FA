@@ -189,11 +189,10 @@ fun TwoFactorScreen(
                 // imported as SHA-1 would produce codes that look right and never work.
                 algorithm = link.algorithm,
                 digits = link.digits,
-                periodSeconds = link.periodSeconds,
-                // The link's kind as well: a counter here is what makes the new entry
-                // counter-based, and importing `otpauth://hotp/` without it would produce
-                // time-based codes for an entry whose server counts.
-                counter = link.counter,
+                // The link's own kind: a counter means `otpauth://hotp/`, and importing it
+                // without that would produce time-based codes for an entry whose server counts.
+                // The schemes that compute their own shape of code say so themselves.
+                kind = link.kind,
                 note = "",
                 unixTime = currentTimeSeconds(),
             )
@@ -442,8 +441,7 @@ fun TwoFactorScreen(
                             secretBase32 = form.secretBase32,
                             algorithm = form.algorithm,
                             digits = form.digits,
-                            periodSeconds = form.periodSeconds,
-                            counter = form.counter,
+                            kind = form.toKind(),
                             note = "",
                             unixTime = currentTimeSeconds(),
                         ) != null
@@ -458,8 +456,7 @@ fun TwoFactorScreen(
                             secretBase32 = form.secretBase32.ifBlank { beingEdited.secretBase32 },
                             algorithm = form.algorithm,
                             digits = form.digits,
-                            periodSeconds = form.periodSeconds,
-                            counter = form.counter,
+                            kind = form.toKind(),
                             note = beingEdited.note,
                             unixTime = currentTimeSeconds(),
                         )
@@ -769,7 +766,7 @@ private fun FormRow(
  * The vault stores no such field: what makes an entry counter-based is the counter it carries,
  * so this is the editor's own name for the choice, and [EntryForm.counter] is where it lands.
  */
-private enum class EntryKind {
+private enum class EditorKind {
     /** TOTP: the code follows the clock, and the entry carries no counter. */
     TimeBased,
 
@@ -794,10 +791,18 @@ private data class EntryForm(
     val periodSeconds: Long,
     /** The counter to store, or `null` for a time-based entry. */
     val counter: Long?,
-)
+) {
+    /**
+     * The kind the library stores for what this form describes.
+     *
+     * The editor still offers the two kinds it always has - a step or a counter - and the
+     * schemes that compute their own shape of code reach the vault through the importer and
+     * through the model. A counter here is what makes the entry counter-based, which is the same
+     * question [EditorKind] asks.
+     */
+    fun toKind(): EntryKind = counter?.let { EntryKind.Hotp(it) } ?: EntryKind.Totp(periodSeconds)
+}
 
-/** The period a new entry starts with, which is the step RFC 6238's own examples use. */
-private const val DEFAULT_PERIOD_SECONDS = 30L
 
 /** The counter a new counter-based entry starts at, which is RFC 4226's first counter. */
 private const val DEFAULT_COUNTER = 0L
@@ -828,7 +833,7 @@ private fun EntryDialog(
     var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
     var period by remember { mutableStateOf((initial?.periodSeconds ?: DEFAULT_PERIOD_SECONDS).toString()) }
     var kind by remember {
-        mutableStateOf(if (initial?.isCounterBased == true) EntryKind.CounterBased else EntryKind.TimeBased)
+        mutableStateOf(if (initial?.isCounterBased == true) EditorKind.CounterBased else EditorKind.TimeBased)
     }
     var counter by remember { mutableStateOf((initial?.counter ?: DEFAULT_COUNTER).toString()) }
 
@@ -903,14 +908,14 @@ private fun EntryDialog(
                     // period for one whose code follows the clock.
                     Text(stringResource(Res.string.field_entry_type), style = MaterialTheme.typography.labelLarge)
                     ChoiceRow(
-                        options = EntryKind.entries,
+                        options = EditorKind.entries,
                         selected = kind,
                         // Resolved above rather than here: the label of a choice is a plain
                         // function, and a resource cannot be read outside composition.
                         label = {
                             when (it) {
-                                EntryKind.TimeBased -> timeBasedLabel
-                                EntryKind.CounterBased -> counterBasedLabel
+                                EditorKind.TimeBased -> timeBasedLabel
+                                EditorKind.CounterBased -> counterBasedLabel
                             }
                         },
                         onSelect = { kind = it },
@@ -937,7 +942,7 @@ private fun EntryDialog(
                             modifier = Modifier.weight(1f),
                         )
                         when (kind) {
-                            EntryKind.TimeBased ->
+                            EditorKind.TimeBased ->
                                 OutlinedTextField(
                                     value = period,
                                     onValueChange = { period = it },
@@ -946,7 +951,7 @@ private fun EntryDialog(
                                     modifier = Modifier.weight(1f),
                                 )
 
-                            EntryKind.CounterBased ->
+                            EditorKind.CounterBased ->
                                 OutlinedTextField(
                                     value = counter,
                                     onValueChange = { counter = it },
@@ -979,8 +984,8 @@ private fun EntryDialog(
                     digitCount != null &&
                     digitCount in 6..8 &&
                     when (kind) {
-                        EntryKind.TimeBased -> periodSeconds != null && periodSeconds > 0
-                        EntryKind.CounterBased -> counterValue != null && counterValue >= 0
+                        EditorKind.TimeBased -> periodSeconds != null && periodSeconds > 0
+                        EditorKind.CounterBased -> counterValue != null && counterValue >= 0
                     }
 
             Button(
@@ -999,10 +1004,10 @@ private fun EntryDialog(
                             // convention keeps there.
                             periodSeconds =
                                 when (kind) {
-                                    EntryKind.TimeBased -> requireNotNull(periodSeconds)
-                                    EntryKind.CounterBased -> periodSeconds?.takeIf { it > 0 } ?: DEFAULT_PERIOD_SECONDS
+                                    EditorKind.TimeBased -> requireNotNull(periodSeconds)
+                                    EditorKind.CounterBased -> periodSeconds?.takeIf { it > 0 } ?: DEFAULT_PERIOD_SECONDS
                                 },
-                            counter = if (kind == EntryKind.CounterBased) requireNotNull(counterValue) else null,
+                            counter = if (kind == EditorKind.CounterBased) requireNotNull(counterValue) else null,
                         ),
                     )
                 },

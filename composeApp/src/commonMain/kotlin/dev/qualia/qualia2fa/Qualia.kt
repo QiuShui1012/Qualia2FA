@@ -7,6 +7,7 @@ import dev.qualia.qualia2fa.ffi.FfiDecision
 import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
 import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiEcLevel
+import dev.qualia.qualia2fa.ffi.FfiEntryKind
 import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiJoiner
@@ -134,13 +135,48 @@ enum class OtpAlgorithm {
 }
 
 /**
+ * The kind of an entry: what decides how its code is computed.
+ *
+ * The library stores this explicitly, and it is not a detail the interface may derive: an mOTP
+ * entry, a Yandex OTP entry and a Steam Guard entry each compute a different shape of code from
+ * the same secret, and treating one as an ordinary TOTP entry produces codes that never match.
+ *
+ * [Motp] and [Yandex] carry a PIN, and the library never hands one back — it is key material with
+ * no display purpose, and the only thing that needs to read it computes the code. `pinSet` is what
+ * the interface gets instead, and the PIN is passed in when an entry is created or changed.
+ */
+/**
+ * The time step a time-based entry uses when nothing says otherwise, in seconds.
+ *
+ * The value RFC 6238's own examples use, and the one a scanned link without a `period` means.
+ */
+const val DEFAULT_PERIOD_SECONDS = 30L
+
+sealed interface EntryKind {
+    /** Time-based (RFC 6238). */
+    data class Totp(val periodSeconds: Long) : EntryKind
+
+    /** Counter-based (RFC 4226). */
+    data class Hotp(val counter: Long) : EntryKind
+
+    /** mOTP: MD5, a ten-second step, six hexadecimal characters, and a PIN. */
+    data class Motp(val periodSeconds: Long, val pinSet: Boolean) : EntryKind
+
+    /** Yandex OTP: SHA-256, eight lower-case letters, and a PIN. */
+    data class Yandex(val periodSeconds: Long, val pinSet: Boolean) : EntryKind
+
+    /** Steam Guard: SHA-1, five characters, a thirty-second step. */
+    data object Steam : EntryKind
+}
+
+/**
  * One entry, as the user interface sees it.
  *
  * A plain Kotlin value: no generated type crosses this boundary.
  *
- * [counter] is the whole of what tells a counter-based entry from a time-based one — the
- * vault stores no separate kind — so [isCounterBased] is derived from it rather than kept
- * beside it.
+ * [kind] says what the entry is: a time step, a counter, or one of the schemes that compute their
+ * own shape of code. The accessors below it — [periodSeconds], [counter], [isCounterBased] — are
+ * derived from it, so a screen may still ask the question the old two-kind model asked.
  */
 data class Entry(
     val id: String,
@@ -150,11 +186,28 @@ data class Entry(
     val secretBase32: String,
     val algorithm: OtpAlgorithm,
     val digits: Int,
-    val periodSeconds: Long,
-    val counter: Long?,
+    val kind: EntryKind,
     val note: String,
 ) {
-    val isCounterBased: Boolean get() = counter != null
+    /**
+     * The time step, for the kinds that have one.
+     *
+     * A counter-based entry has no step, and a Steam Guard entry's step is fixed by the scheme
+     * rather than stored, so this is the step a code would use rather than a field of the entry.
+     */
+    val periodSeconds: Long
+        get() =
+            when (val kind = kind) {
+                is EntryKind.Totp -> kind.periodSeconds
+                is EntryKind.Motp -> kind.periodSeconds
+                is EntryKind.Yandex -> kind.periodSeconds
+                is EntryKind.Hotp, EntryKind.Steam -> DEFAULT_PERIOD_SECONDS
+            }
+
+    /** The counter, for the kind that counts. */
+    val counter: Long? get() = (kind as? EntryKind.Hotp)?.counter
+
+    val isCounterBased: Boolean get() = kind is EntryKind.Hotp
 }
 
 /**
@@ -183,7 +236,7 @@ class Vault internal constructor(private val inner: FfiVault) {
      */
     fun code(id: String, unixTime: Long): String? =
         try {
-            if (inner.entry(id)?.counter != null) null else inner.totpFor(id, unixTime.toULong())
+            inner.codeFor(id, unixTime.toULong())
         } catch (_: Exception) {
             null
         }
@@ -197,7 +250,7 @@ class Vault internal constructor(private val inner: FfiVault) {
      */
     fun counterCode(id: String, counter: Long): String? =
         try {
-            if (inner.entry(id)?.counter == null) null else inner.hotpFor(id, counter.toULong())
+            inner.hotpFor(id, counter.toULong())
         } catch (_: Exception) {
             null
         }
@@ -223,9 +276,12 @@ class Vault internal constructor(private val inner: FfiVault) {
     fun advanceCounter(id: String, unixTime: Long): Boolean {
         return try {
             val entry = inner.entry(id) ?: return false
-            val counter = entry.counter ?: return false
-            if (counter >= Long.MAX_VALUE.toULong()) return false
-            inner.updateEntry(entry.copy(counter = counter + 1uL), unixTime.toULong())
+            val kind = entry.kind as? FfiEntryKind.Hotp ?: return false
+            if (kind.counter >= Long.MAX_VALUE.toULong()) return false
+            inner.updateEntry(
+                entry.copy(kind = FfiEntryKind.Hotp(counter = kind.counter + 1uL)),
+                unixTime.toULong(),
+            )
             true
         } catch (_: Exception) {
             false
@@ -248,10 +304,10 @@ class Vault internal constructor(private val inner: FfiVault) {
         secretBase32: String,
         algorithm: OtpAlgorithm,
         digits: Int,
-        periodSeconds: Long,
-        counter: Long?,
+        kind: EntryKind,
         note: String,
         unixTime: Long,
+        pin: String? = null,
     ): String? {
         val entry =
             buildEntry(
@@ -262,9 +318,9 @@ class Vault internal constructor(private val inner: FfiVault) {
                 secretBase32,
                 algorithm,
                 digits,
-                periodSeconds,
-                counter,
+                kind,
                 note,
+                pin,
             ) ?: return null
         return try {
             inner.addEntry(entry, unixTime.toULong())
@@ -289,13 +345,13 @@ class Vault internal constructor(private val inner: FfiVault) {
         secretBase32: String,
         algorithm: OtpAlgorithm,
         digits: Int,
-        periodSeconds: Long,
-        counter: Long?,
+        kind: EntryKind,
         note: String,
         unixTime: Long,
+        pin: String? = null,
     ): Boolean {
         val entry =
-            buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, periodSeconds, counter, note)
+            buildEntry(id, name, issuer, account, secretBase32, algorithm, digits, kind, note, pin)
                 ?: return false
         return try {
             inner.updateEntry(entry, unixTime.toULong())
@@ -379,9 +435,9 @@ private fun buildEntry(
     secretBase32: String,
     algorithm: OtpAlgorithm,
     digits: Int,
-    periodSeconds: Long,
-    counter: Long?,
+    kind: EntryKind,
     note: String,
+    pin: String? = null,
 ): FfiVaultEntry? {
     val ffiDigits = digitsOf(digits) ?: return null
     return FfiVaultEntry(
@@ -392,9 +448,11 @@ private fun buildEntry(
         secretBase32 = secretBase32,
         algorithm = algorithm.toFfi(),
         digits = ffiDigits,
-        period = periodSeconds.toULong(),
-        counter = counter?.toULong(),
+        kind = kind.toFfi(pin),
         note = note,
+        // Read-only for the library: it never hands a PIN back, and a write takes the value
+        // through the kind. This is what the entry being written will hold.
+        pinSet = !pin.isNullOrEmpty(),
         createdAt = 0uL,
         updatedAt = 0uL,
     )
@@ -416,8 +474,7 @@ private fun FfiVaultEntry.toEntry(): Entry =
         secretBase32 = secretBase32,
         algorithm = algorithm.toFacade(),
         digits = digits.toCount(),
-        periodSeconds = period.toLong(),
-        counter = counter?.toLong(),
+        kind = kind.toFacade(pinSet),
         note = note,
     )
 
@@ -430,17 +487,50 @@ private fun FfiVaultEntry.toEntry(): Entry =
  */
 private fun digitsOf(count: Int): FfiDigits? =
     when (count) {
-        6 -> FfiDigits.SIX
-        7 -> FfiDigits.SEVEN
-        8 -> FfiDigits.EIGHT
+        5 -> FfiDigits.Five
+        6 -> FfiDigits.Six
+        7 -> FfiDigits.Seven
+        8 -> FfiDigits.Eight
+        9 -> FfiDigits.Nine
+        in 1..4 -> FfiDigits.Other(count.toUByte())
         else -> null
     }
 
 private fun FfiDigits.toCount(): Int =
     when (this) {
-        FfiDigits.SIX -> 6
-        FfiDigits.SEVEN -> 7
-        FfiDigits.EIGHT -> 8
+        FfiDigits.Five -> 5
+        FfiDigits.Six -> 6
+        FfiDigits.Seven -> 7
+        FfiDigits.Eight -> 8
+        FfiDigits.Nine -> 9
+        is FfiDigits.Other -> digits.toInt()
+    }
+
+/**
+ * The library's kind for a facade kind.
+ *
+ * [pin] is only meaningful for the two kinds that compute with one, and only when the user
+ * supplied it: `null` on an update means "keep the stored PIN", which is what lets a form edit a
+ * note without asking for a value it was never shown.
+ */
+private fun EntryKind.toFfi(pin: String?): FfiEntryKind =
+    when (this) {
+        is EntryKind.Totp -> FfiEntryKind.Totp(period = periodSeconds.toULong())
+        is EntryKind.Hotp -> FfiEntryKind.Hotp(counter = counter.toULong())
+        is EntryKind.Motp ->
+            FfiEntryKind.Motp(period = periodSeconds.toULong(), pin = pin?.takeIf { it.isNotEmpty() })
+        is EntryKind.Yandex ->
+            FfiEntryKind.Yandex(period = periodSeconds.toULong(), pin = pin?.takeIf { it.isNotEmpty() })
+        EntryKind.Steam -> FfiEntryKind.Steam
+    }
+
+private fun FfiEntryKind.toFacade(pinStored: Boolean): EntryKind =
+    when (this) {
+        is FfiEntryKind.Totp -> EntryKind.Totp(period.toLong())
+        is FfiEntryKind.Hotp -> EntryKind.Hotp(counter.toLong())
+        is FfiEntryKind.Motp -> EntryKind.Motp(period.toLong(), pinStored)
+        is FfiEntryKind.Yandex -> EntryKind.Yandex(period.toLong(), pinStored)
+        FfiEntryKind.Steam -> EntryKind.Steam
     }
 
 /** The two enums name the same three algorithms; the mapping is the whole contract. */
@@ -623,8 +713,7 @@ object Qualia {
                     secretBase32 = parsed.secretBase32,
                     algorithm = parsed.algorithm.toFacade(),
                     digits = parsed.digits.toCount(),
-                    periodSeconds = parsed.period.toLong(),
-                    counter = parsed.counter?.toLong(),
+                    kind = parsed.kind.toFacade(pinStored = false),
                 )
             } catch (_: Exception) {
                 null
@@ -1542,16 +1631,27 @@ data class OtpAuthLink(
      */
     val algorithm: OtpAlgorithm,
     val digits: Int,
-    val periodSeconds: Long,
     /**
-     * The counter the link names, or `null` when it names none.
+     * The kind the link describes.
      *
-     * This is also which of the two kinds of entry the link describes: the core refuses a
-     * counter-based link without a counter and a time-based one that carries a counter, so a
-     * value here means exactly `otpauth://hotp/…`, exactly as a counter in an entry does.
+     * `otpauth://hotp/…` is a counter, the other spellings are a step, and the two schemes that
+     * compute their own shape of code say so themselves — so the link carries the kind rather
+     * than a counter that a caller has to interpret.
      */
-    val counter: Long?,
-)
+    val kind: EntryKind,
+) {
+    /** The time step, for the kinds that have one. */
+    val periodSeconds: Long
+        get() = when (val kind = kind) {
+            is EntryKind.Totp -> kind.periodSeconds
+            is EntryKind.Motp -> kind.periodSeconds
+            is EntryKind.Yandex -> kind.periodSeconds
+            is EntryKind.Hotp, EntryKind.Steam -> DEFAULT_PERIOD_SECONDS
+        }
+
+    /** The counter, for a link that describes a counter-based entry. */
+    val counter: Long? get() = (kind as? EntryKind.Hotp)?.counter
+}
 
 /**
  * The master key store of the wrapped form: a key-encryption key in the platform key store,
