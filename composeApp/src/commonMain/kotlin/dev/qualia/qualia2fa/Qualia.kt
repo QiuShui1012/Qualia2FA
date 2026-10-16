@@ -10,6 +10,10 @@ import dev.qualia.qualia2fa.ffi.FfiEcLevel
 import dev.qualia.qualia2fa.ffi.FfiEntryKind
 import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
+import dev.qualia.qualia2fa.ffi.FfiImport
+import dev.qualia.qualia2fa.ffi.FfiImportChoice
+import dev.qualia.qualia2fa.ffi.FfiImportDecision
+import dev.qualia.qualia2fa.ffi.FfiImportFormat
 import dev.qualia.qualia2fa.ffi.FfiJoiner
 import dev.qualia.qualia2fa.ffi.FfiLanChannel
 import dev.qualia.qualia2fa.ffi.FfiLanLobby
@@ -26,6 +30,7 @@ import dev.qualia.qualia2fa.ffi.FfiSyncSession
 import dev.qualia.qualia2fa.ffi.FfiTransport
 import dev.qualia.qualia2fa.ffi.FfiTransportCapabilities
 import dev.qualia.qualia2fa.ffi.FfiWrappedMasterKeyStore
+import dev.qualia.qualia2fa.ffi.detectImportFormat as ffiDetectImportFormat
 import dev.qualia.qualia2fa.ffi.parseOtpauthUri as ffiParseOtpAuthUri
 import dev.qualia.qualia2fa.ffi.qrDecodeText as ffiQrDecodeText
 import dev.qualia.qualia2fa.ffi.qrEncodeFrames as ffiQrEncodeFrames
@@ -217,6 +222,13 @@ data class Entry(
  * without touching the user interface.
  */
 class Vault internal constructor(private val inner: FfiVault) {
+    /**
+     * The generated handle, for the parts of this file that need to hand the vault to the
+     * library - comparing an import against it, and applying one to it. It stays inside this
+     * file: nothing outside names a generated type.
+     */
+    internal fun handle(): FfiVault = inner
+
     val entryCount: Int get() = inner.entryCount().toInt()
 
     val isEmpty: Boolean get() = inner.isEmpty()
@@ -548,6 +560,193 @@ private fun FfiAlgorithm.toFacade(): OtpAlgorithm =
         FfiAlgorithm.SHA512 -> OtpAlgorithm.Sha512
     }
 
+/** How a file to import is read. */
+enum class ImportFormat {
+    /** A JSON export, which may be encrypted. */
+    Json,
+
+    /** An HTML page an authenticator exported. */
+    Html,
+
+    /** One `otpauth://` link per line. */
+    Text,
+    ;
+
+    internal fun toFfi(): FfiImportFormat =
+        when (this) {
+            Json -> FfiImportFormat.JSON
+            Html -> FfiImportFormat.HTML
+            Text -> FfiImportFormat.TEXT
+        }
+}
+
+private fun FfiImportFormat.toFacade(): ImportFormat =
+    when (this) {
+        FfiImportFormat.JSON -> ImportFormat.Json
+        FfiImportFormat.HTML -> ImportFormat.Html
+        FfiImportFormat.TEXT -> ImportFormat.Text
+    }
+
+/**
+ * One entry an export contributes, as a preview shows it.
+ *
+ * The kind says how its code will be computed, and for the two kinds that compute with a PIN the
+ * PIN itself is **not** part of this: it stays in the library, which keeps the parsed export and
+ * uses it when the import is applied. An entry created by an import therefore reports a PIN as
+ * set once it is in the vault, and this preview says nothing about it either way.
+ */
+data class ImportedEntry(
+    /** The row's position in the file, which is what a decision refers to. */
+    val position: Int,
+    val name: String,
+    val issuer: String,
+    val account: String,
+    val algorithm: OtpAlgorithm,
+    val digits: Int,
+    val kind: EntryKind,
+    val favorite: Boolean,
+    /** The export carried an icon, which is not part of a vault. */
+    val iconDropped: Boolean,
+    /** The export named no step and the schema's own default had to be assumed. */
+    val periodAssumed: Boolean,
+)
+
+/** A row the reader could not use, and why. The reason never quotes a secret. */
+data class ImportProblem(val position: Int, val reason: String)
+
+/** A group the export carries. */
+data class ImportedGroup(val id: String, val name: String)
+
+/** What the export could not carry across, counted. */
+data class ImportDropped(val icons: Int, val periodsAssumed: Int, val duplicates: Int)
+
+/**
+ * What a vault already holds of one imported entry.
+ *
+ * [identical] means every field matches and there is nothing to decide. Otherwise [existing] names
+ * the entries it collides with and [differences] names the fields that differ, so the user can be
+ * asked a question with the answer in front of them.
+ */
+data class ImportMatch(
+    val position: Int,
+    val identical: Boolean,
+    val existing: List<String>,
+    val differences: List<String>,
+)
+
+/** What the user decided about one imported entry. */
+sealed interface ImportDecision {
+    /** Add it as a new entry. */
+    data object Add : ImportDecision
+
+    /** Leave it out. */
+    data object Skip : ImportDecision
+
+    /** Replace an entry the vault already holds. */
+    data class Replace(val entryId: String) : ImportDecision
+
+    /** Add it beside the entry it collides with, keeping both. */
+    data object KeepBoth : ImportDecision
+}
+
+/** What an applied import did. */
+data class ImportApplied(
+    val added: Int,
+    val replaced: Int,
+    val skipped: Int,
+    val groupsCreated: List<String>,
+    val groupsExisting: List<String>,
+)
+
+/**
+ * A read export, ready to be previewed and applied.
+ *
+ * The parsed file lives in the library: what crosses is what a preview shows, and the secret of
+ * each entry never does. An entry the user answered nothing about is **added**, never overwritten
+ * - losing a note the user wrote is worse than leaving a duplicate they can delete.
+ */
+class Import internal constructor(private val inner: FfiImport) {
+    /** The entries the export contributes. */
+    fun entries(): List<ImportedEntry> =
+        inner.entries().map {
+            ImportedEntry(
+                position = it.position.toInt(),
+                name = it.name,
+                issuer = it.issuer.orEmpty(),
+                account = it.account,
+                algorithm = it.algorithm.toFacade(),
+                digits = it.digits.toCount(),
+                // The PIN of an imported entry is not part of the preview: it is applied from the
+                // parsed export when the import is, so nothing here reports it.
+                kind = it.kind.toFacade(pinStored = false),
+                favorite = it.favorite,
+                iconDropped = it.iconDropped,
+                periodAssumed = it.periodAssumed,
+            )
+        }
+
+    /** The rows that could not be used. */
+    fun problems(): List<ImportProblem> = inner.problems().map { ImportProblem(it.position.toInt(), it.reason) }
+
+    /** The groups the export carries, in the order it lists them. */
+    fun groups(): List<ImportedGroup> = inner.groups().map { ImportedGroup(it.id, it.name) }
+
+    /** What the export could not carry across. */
+    fun dropped(): ImportDropped =
+        inner.dropped().let {
+            ImportDropped(
+                icons = it.icons.toInt(),
+                periodsAssumed = it.periodsAssumed.toInt(),
+                duplicates = it.duplicates.toInt(),
+            )
+        }
+
+    /** What [vault] already holds of each entry, one row per imported entry. */
+    fun compare(vault: Vault): List<ImportMatch> =
+        inner.compare(vault.handle()).map {
+            ImportMatch(
+                position = it.position.toInt(),
+                identical = it.identical,
+                existing = it.existing,
+                differences = it.differences,
+            )
+        }
+
+    /**
+     * Applies the answers to [vault], or returns `null` when the vault refused.
+     *
+     * [decisions] holds an answer per position. A position left out is **added**: an import that
+     * silently dropped rows the user never saw a question about would lose entries, and one that
+     * silently overwrote would lose notes.
+     */
+    fun apply(vault: Vault, decisions: Map<Int, ImportDecision>): ImportApplied? =
+        try {
+            val choices =
+                decisions.map { (position, decision) ->
+                    FfiImportChoice(
+                        position = position.toULong(),
+                        decision =
+                            when (decision) {
+                                ImportDecision.Add -> FfiImportDecision.Add
+                                ImportDecision.Skip -> FfiImportDecision.Skip
+                                ImportDecision.KeepBoth -> FfiImportDecision.KeepBoth
+                                is ImportDecision.Replace -> FfiImportDecision.Replace(entryId = decision.entryId)
+                            },
+                    )
+                }
+            inner.apply(vault.handle(), choices).let {
+                ImportApplied(
+                    added = it.added.toInt(),
+                    replaced = it.replaced.toInt(),
+                    skipped = it.skipped.toInt(),
+                    groupsCreated = it.groupsCreated,
+                    groupsExisting = it.groupsExisting,
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+}
 /**
  * The narrow facade over the generated UniFFI bindings.
  *
@@ -718,6 +917,44 @@ object Qualia {
             } catch (_: Exception) {
                 null
             }
+
+    /**
+     * Reads a file another authenticator exported, without touching a vault.
+     *
+     * [format] says how to read it, and [password] is the export's own password for the formats
+     * that can be encrypted. Returns `null` when the file cannot be read at all; a file that was
+     * read and holds rows that could not be used comes back with those rows as problems, because
+     * "we understood most of it" is what the user needs to hear.
+     *
+     * Nothing secret crosses: the parsed export stays in the library, and what comes back is what
+     * a preview needs.
+     */
+    fun readImport(
+        bytes: ByteArray,
+        format: ImportFormat,
+        password: String?,
+        now: Long,
+    ): Import? =
+        try {
+            Import(
+                FfiImport.preview(
+                    bytes = bytes,
+                    format = format.toFfi(),
+                    password = password?.takeIf { it.isNotEmpty() },
+                    now = now.toULong(),
+                ),
+            )
+        } catch (_: Exception) {
+            null
+        }
+
+    /** Guesses how to read [bytes], or `null` when the content is not recognisable. */
+    fun detectImportFormat(bytes: ByteArray): ImportFormat? =
+        try {
+            ffiDetectImportFormat(bytes)?.toFacade()
+        } catch (_: Exception) {
+            null
+        }
 
     /** The master key length, in bytes, that the core expects. */
     const val MASTER_KEY_BYTES = 32

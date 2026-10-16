@@ -129,4 +129,58 @@ class QualiaTest {
 
         assertEquals("94287082", vault.code(id, 59))
     }
+    /**
+     * An export is read, previewed and applied, and applying it twice adds nothing twice.
+     *
+     * The text an export holds is what another application wrote, so the reader is fed a link per
+     * line plus one line that is not a link at all: a file with a row that cannot be used is the
+     * normal case, and it must come back as a reported row rather than as a refusal of the whole
+     * file or as a silently missing entry.
+     */
+    @Test
+    fun anExportIsReadPreviewedAndApplied() {
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()))
+        val bytes =
+            (
+                "otpauth://totp/Qualia:alice?secret=JBSWY3DPEHPK3PXP&issuer=Qualia&digits=6&period=30\n" +
+                    "otpauth://hotp/Qualia:bob?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Qualia&counter=1\n" +
+                    "this line is not a link at all\n"
+            ).toByteArray()
+
+        assertEquals(ImportFormat.Text, Qualia.detectImportFormat(bytes), "the content must be recognised")
+
+        val parsed =
+            assertNotNull(
+                Qualia.readImport(bytes, ImportFormat.Text, password = null, now = 1_700_000_000),
+                "the export must be read",
+            )
+        val entries = parsed.entries()
+        assertEquals(2, entries.size, "the two links must be read")
+        assertEquals("Qualia", entries[0].issuer)
+        assertEquals(EntryKind.Totp(30), entries[0].kind, "the first link is time based")
+        assertTrue(entries[1].kind is EntryKind.Hotp, "the second link counts: ${entries[1].kind}")
+        assertEquals(1, parsed.problems().size, "the line that is not a link must be reported")
+
+        assertTrue(parsed.compare(vault).all { it.existing.isEmpty() }, "the vault holds none of them")
+        val applied = assertNotNull(parsed.apply(vault, emptyMap()), "the import must apply")
+        assertEquals(2, applied.added, "both entries must be added")
+        assertEquals(2, vault.entryCount, "the vault must hold both")
+
+        val again =
+            assertNotNull(
+                Qualia.readImport(bytes, ImportFormat.Text, password = null, now = 1_700_000_000),
+                "the same export must be readable again",
+            )
+        assertEquals(
+            2,
+            again.compare(vault).count { it.identical },
+            "both entries are already in the vault, unchanged",
+        )
+        assertEquals(
+            0,
+            assertNotNull(again.apply(vault, emptyMap()), "re-applying must be accepted").added,
+            "nothing may be added twice",
+        )
+        assertEquals(2, vault.entryCount, "the vault still holds exactly what it held")
+    }
 }

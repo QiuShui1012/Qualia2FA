@@ -527,6 +527,18 @@ private fun EntryCard(
     val service = entry.issuer.takeIf { it.isNotBlank() }
     val counter = entry.counter
     val changing = code != null && counter == null
+    // A scheme that computes its own shape of code is named on the card. Steam Guard's five
+    // characters and mOTP's hexadecimal ones are what a user sees and cannot place otherwise,
+    // and an entry computed by the wrong scheme looks exactly like one computed by the right
+    // one until a server rejects the code. A plain TOTP entry gets no chip: it is what the
+    // screen is for, and a counter-based entry already says so on its own line.
+    val kindLabel =
+        when (entry.kind) {
+            is EntryKind.Motp -> stringResource(Res.string.entry_type_motp)
+            is EntryKind.Yandex -> stringResource(Res.string.entry_type_yandex)
+            EntryKind.Steam -> stringResource(Res.string.entry_type_steam)
+            is EntryKind.Hotp, is EntryKind.Totp -> null
+        }
 
     Card(
         modifier =
@@ -577,6 +589,10 @@ private fun EntryCard(
                     if (service != null) {
                         Text("·", style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
                         Text(service, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
+                    }
+                    if (kindLabel != null) {
+                        Text("·", style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
+                        Text(kindLabel, style = MaterialTheme.typography.bodySmall, modifier = Modifier.alignByBaseline())
                     }
                 }
 
