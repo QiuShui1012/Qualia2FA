@@ -176,6 +176,15 @@
     <string name="sync_result_nothing_new">Nothing new: this device already had everything that code carried.</string>
     <string name="sync_result_summary">Added %1$d, tombstones %2$d, deletions applied %3$d, unchanged %4$d.</string>
     <string name="sync_result_needs_decision">The two devices disagree about %1$d of them; decide below.</string>
+    <string name="sync_conflict_ordering">The two devices arranged %1$s differently</string>
+    <string name="sync_conflict_ordering_top">the top group</string>
+    <string name="sync_conflict_ordering_hint">The order inside a group is shown on both devices, so one of the two arrangements has to be chosen.</string>
+    <string name="sync_conflict_ordering_renamed">Renamed: %1$s here, %2$s there</string>
+    <string name="sync_conflict_ordering_local">This device</string>
+    <string name="sync_conflict_ordering_incoming">The other device</string>
+    <string name="sync_conflict_ordering_empty">No entries</string>
+    <string name="action_use_local_order">Keep this device's order</string>
+    <string name="action_use_incoming_order">Take the other order</string>
     <string name="sync_conflict_heading">Disagreement</string>
     <string name="sync_conflict_entry_mismatch">Both devices changed this entry.</string>
     <string name="sync_conflict_peer_deleted">The other device deleted this entry; this one still has it.</string>

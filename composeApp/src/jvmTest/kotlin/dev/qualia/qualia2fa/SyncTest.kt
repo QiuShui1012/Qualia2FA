@@ -205,4 +205,55 @@ class SyncTest {
             assertEquals(SyncRefusal.NotACode, result.reason, "for \"$text\"")
         }
     }
+    /**
+     * Two devices that arranged one group differently can be shown both arrangements and asked.
+     *
+     * The order inside a group travels between devices, so it is a disagreement like any other and
+     * the reader never picks a side on its own. What the test pins down is that both arrangements
+     * arrive complete - the chooser is useless if one of them is missing or is a copy of the other
+     * - and that the answer is applied to the side it names.
+     */
+    @Test
+    fun anOrderingConflictOffersBothArrangements() {
+        val (vaultA, vaultB) = twoVaultsOfOneAccount()
+        val first = addEntry(vaultA)
+        val second = addEntry(vaultA)
+
+        val groupId = assertNotNull(vaultA.createGroup("Work"), "a group must be created")
+        assertTrue(vaultA.assignToGroup(first, groupId), "the first entry must move")
+        assertTrue(vaultA.assignToGroup(second, groupId), "the second entry must move")
+        assertTrue(vaultA.setOrdering(groupId, listOf(first, second)), "the order must be written")
+
+        val sessionA = assertNotNull(Qualia.syncSession(vaultA, deviceA))
+        val sessionB = assertNotNull(Qualia.syncSession(vaultB, deviceB))
+        merge(sessionB, assertNotNull(sessionA.myCodeText()))
+        assertEquals(
+            listOf(first, second),
+            vaultB.groups().single { it.id == groupId }.entryIds,
+            "the group arrives with the order it was arranged in",
+        )
+
+        assertTrue(vaultB.setOrdering(groupId, listOf(second, first)), "the other device must arrange it")
+
+        val outcome = merge(sessionB, assertNotNull(sessionA.myCodeText()))
+        val conflict = outcome.conflicts.single { it.kind == SyncConflictKind.OrderingMismatch }
+        val ordering = assertNotNull(conflict.ordering, "the two arrangements must be shown")
+        // The merge ran on B, so this device is B: the arrangement it wrote is the local one, and
+        // the incoming one is what A arranged.
+        assertEquals(listOf(second, first), ordering.local, "this device's arrangement")
+        assertEquals(listOf(first, second), ordering.incoming, "the peer's arrangement")
+        assertEquals("Work", ordering.localName, "the group is named")
+        assertTrue(!ordering.top, "this is a named group")
+        assertNull(conflict.local, "an arrangement has no entry to show as a side")
+
+        assertTrue(
+            sessionB.decide(conflict.entryId, takeIncoming = true),
+            "taking the other order must be accepted",
+        )
+        assertEquals(
+            listOf(first, second),
+            vaultB.groups().single { it.id == groupId }.entryIds,
+            "the arrangement that was chosen is the one that stays",
+        )
+    }
 }

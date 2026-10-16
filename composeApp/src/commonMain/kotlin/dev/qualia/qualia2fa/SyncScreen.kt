@@ -47,6 +47,15 @@ import dev.qualia.qualia2fa.resources.lan_permission_refused
 import dev.qualia.qualia2fa.resources.message_copied
 import dev.qualia.qualia2fa.resources.nav_sync
 import dev.qualia.qualia2fa.resources.sync_conflict_entry_mismatch
+import dev.qualia.qualia2fa.resources.action_use_incoming_order
+import dev.qualia.qualia2fa.resources.action_use_local_order
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_empty
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_hint
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_incoming
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_local
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_renamed
+import dev.qualia.qualia2fa.resources.sync_conflict_ordering_top
 import dev.qualia.qualia2fa.resources.sync_conflict_heading
 import dev.qualia.qualia2fa.resources.sync_conflict_local_deleted
 import dev.qualia.qualia2fa.resources.sync_conflict_local_is_newer
@@ -444,11 +453,15 @@ fun SyncScreen(
         }
 
         if (conflicts.items.isNotEmpty()) {
+            // Resolved once per set of conflicts: an arrangement is a list of identifiers, and what
+            // the user has to choose between is the names they see on their own screen.
+            val names = remember(conflicts.items) { vault.entries().associate { it.id to it.name } }
             SectionCard(title = stringResource(Res.string.sync_conflict_heading)) {
                 MessageLine(stringResource(Res.string.sync_result_needs_decision, conflicts.items.size))
                 conflicts.items.forEach { conflict ->
                     ConflictCard(
                         conflict = conflict,
+                        names = names,
                         onDecide = { takeIncoming ->
                             if (conflicts.decide(conflict.entryId, takeIncoming)) {
                                 conflicts = conflicts.settled()
@@ -568,24 +581,57 @@ private fun LanPeerChoice(peer: LanPeer, selected: Boolean, onSelect: () -> Unit
  * that out from the conflict is a user who will pick wrong once.
  */
 @Composable
-private fun ConflictCard(conflict: SyncConflict, onDecide: (Boolean) -> Unit) {
+private fun ConflictCard(
+    conflict: SyncConflict,
+    names: Map<String, String>,
+    onDecide: (Boolean) -> Unit,
+) {
+    val ordering = conflict.ordering
+
     SectionCard {
         Text(
             when (conflict.kind) {
                 SyncConflictKind.EntryMismatch -> stringResource(Res.string.sync_conflict_entry_mismatch)
                 SyncConflictKind.PeerDeleted -> stringResource(Res.string.sync_conflict_peer_deleted)
                 SyncConflictKind.LocalDeleted -> stringResource(Res.string.sync_conflict_local_deleted)
+                SyncConflictKind.OrderingMismatch ->
+                    stringResource(
+                        Res.string.sync_conflict_ordering,
+                        if (ordering?.top == true) {
+                            stringResource(Res.string.sync_conflict_ordering_top)
+                        } else {
+                            ordering?.localName.orEmpty()
+                        },
+                    )
                 SyncConflictKind.Unknown -> stringResource(Res.string.sync_conflict_heading)
             },
             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
         )
 
-        if (conflict.kind == SyncConflictKind.PeerDeleted && conflict.localIsNewer) {
-            Hint(stringResource(Res.string.sync_conflict_local_is_newer))
-        }
+        if (ordering != null) {
+            // Both arrangements are shown, each named by the device it came from. Which list is
+            // which is the whole question, and "local" and "incoming" are not answers a user can
+            // work with.
+            Hint(stringResource(Res.string.sync_conflict_ordering_hint))
+            if (!ordering.top && ordering.localName != ordering.incomingName) {
+                Hint(
+                    stringResource(
+                        Res.string.sync_conflict_ordering_renamed,
+                        ordering.localName,
+                        ordering.incomingName,
+                    ),
+                )
+            }
+            ArrangementRow(stringResource(Res.string.sync_conflict_ordering_local), ordering.local, names)
+            ArrangementRow(stringResource(Res.string.sync_conflict_ordering_incoming), ordering.incoming, names)
+        } else {
+            if (conflict.kind == SyncConflictKind.PeerDeleted && conflict.localIsNewer) {
+                Hint(stringResource(Res.string.sync_conflict_local_is_newer))
+            }
 
-        SideRow(stringResource(Res.string.sync_conflict_side_local), conflict.local)
-        SideRow(stringResource(Res.string.sync_conflict_side_incoming), conflict.incoming)
+            SideRow(stringResource(Res.string.sync_conflict_side_local), conflict.local)
+            SideRow(stringResource(Res.string.sync_conflict_side_incoming), conflict.incoming)
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
             OutlinedButton(onClick = { onDecide(false) }) {
@@ -593,6 +639,7 @@ private fun ConflictCard(conflict: SyncConflict, onDecide: (Boolean) -> Unit) {
                     when (conflict.kind) {
                         SyncConflictKind.PeerDeleted -> stringResource(Res.string.action_keep_entry)
                         SyncConflictKind.LocalDeleted -> stringResource(Res.string.action_keep_deleted)
+                        SyncConflictKind.OrderingMismatch -> stringResource(Res.string.action_use_local_order)
                         else -> stringResource(Res.string.action_keep_local)
                     },
                 )
@@ -602,9 +649,33 @@ private fun ConflictCard(conflict: SyncConflict, onDecide: (Boolean) -> Unit) {
                     when (conflict.kind) {
                         SyncConflictKind.PeerDeleted -> stringResource(Res.string.action_accept_deletion)
                         SyncConflictKind.LocalDeleted -> stringResource(Res.string.action_restore_entry)
+                        SyncConflictKind.OrderingMismatch -> stringResource(Res.string.action_use_incoming_order)
                         else -> stringResource(Res.string.action_take_incoming)
                     },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * One device's arrangement of a group, in order.
+ *
+ * The entries are named rather than numbered by their identifiers: what the user is choosing
+ * between is the order they see on their own screen, and an identifier is not something they have
+ * ever seen. An entry that is in the arrangement but not in this vault - the peer's copy of a
+ * group can name one this device has not received - is shown by its position, which is at least
+ * what the arrangement is about.
+ */
+@Composable
+private fun ArrangementRow(label: String, ids: List<String>, names: Map<String, String>) {
+    Column {
+        Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+        if (ids.isEmpty()) {
+            Text(stringResource(Res.string.sync_conflict_ordering_empty))
+        } else {
+            ids.forEachIndexed { index, id ->
+                Text("${index + 1}. ${names[id] ?: shortDeviceId(id)}")
             }
         }
     }

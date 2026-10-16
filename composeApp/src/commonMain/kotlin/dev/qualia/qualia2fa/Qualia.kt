@@ -1397,6 +1397,30 @@ data class SyncConflict(
     val local: SyncSide?,
     val incoming: SyncSide?,
     val localIsNewer: Boolean,
+    /**
+     * The two arrangements in disagreement, when the conflict is about one.
+     *
+     * When this is set, [entryId] is a **group** identifier rather than an entry one: a decision
+     * about an ordering is a decision about a whole group, and the identifier is whatever the
+     * decision has to name.
+     */
+    val ordering: OrderingConflict?,
+)
+
+/**
+ * Two devices arranged one group differently.
+ *
+ * Both arrangements say which entries are in the group and in which order. The group's name is
+ * carried on each side because a rename is one of the ways an arrangement can disagree, and the
+ * top group - the one entries belong to when they belong to no named one - has no name on either
+ * side, which is what [top] says.
+ */
+data class OrderingConflict(
+    val localName: String,
+    val incomingName: String,
+    val top: Boolean,
+    val local: List<String>,
+    val incoming: List<String>,
 )
 
 /** The shape of a disagreement, with a fallback for shapes a newer library may report. */
@@ -1409,6 +1433,9 @@ enum class SyncConflictKind {
 
     /** This device deleted it and the other one still has it. */
     LocalDeleted,
+
+    /** The two devices arranged one group differently. */
+    OrderingMismatch,
 
     /** A shape this version does not know; the two sides are shown without a verdict. */
     Unknown,
@@ -1812,11 +1839,22 @@ private fun FfiConflict.toConflict(): SyncConflict =
                 "entry_mismatch" -> SyncConflictKind.EntryMismatch
                 "peer_deleted" -> SyncConflictKind.PeerDeleted
                 "local_deleted" -> SyncConflictKind.LocalDeleted
+                "ordering_mismatch" -> SyncConflictKind.OrderingMismatch
                 else -> SyncConflictKind.Unknown
             },
         local = local?.toSide(),
         incoming = incoming?.toSide(),
         localIsNewer = localIsNewer,
+        ordering =
+            ordering?.let {
+                OrderingConflict(
+                    localName = it.localName,
+                    incomingName = it.incomingName,
+                    top = it.top,
+                    local = it.local,
+                    incoming = it.incoming,
+                )
+            },
     )
 
 /** Converts one side of a conflict. */

@@ -169,6 +169,15 @@
     <string name="sync_result_nothing_new">没有新内容：这个码里的东西本机都有了。</string>
     <string name="sync_result_summary">新增 %1$d，墓碑 %2$d，应用删除 %3$d，无变化 %4$d。</string>
     <string name="sync_result_needs_decision">其中 %1$d 条两边不一致，请在下面裁决。</string>
+    <string name="sync_conflict_ordering">两台设备对 %1$s 的排列不一致</string>
+    <string name="sync_conflict_ordering_top">顶分组</string>
+    <string name="sync_conflict_ordering_hint">分组内的顺序两台设备都会显示，因此必须在两个排列里选一个。</string>
+    <string name="sync_conflict_ordering_renamed">改名了：本机叫 %1$s，对方叫 %2$s</string>
+    <string name="sync_conflict_ordering_local">本机</string>
+    <string name="sync_conflict_ordering_incoming">对方</string>
+    <string name="sync_conflict_ordering_empty">没有条目</string>
+    <string name="action_use_local_order">用本机顺序</string>
+    <string name="action_use_incoming_order">用对方顺序</string>
     <string name="sync_conflict_heading">需要裁决</string>
     <string name="sync_conflict_entry_mismatch">两台设备都改过这条条目。</string>
     <string name="sync_conflict_peer_deleted">对方删除了这条条目；本机还留着它。</string>
