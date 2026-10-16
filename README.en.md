@@ -86,12 +86,29 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   written. An entry the vault already holds unchanged is skipped; an entry that uses the same
   secret but differs always asks — replace, skip, add, or keep both is the user's call, never
   the reader's
+- **Exporting**: "Export" writes the whole vault in one of the four formats another
+  authenticator reads — one link per line, JSON, encrypted JSON, or an HTML table. **Only the
+  encrypted JSON takes a password, and only it is encrypted**: the other three are plaintext,
+  which the screen says before a format is picked, and the HTML form draws a QR code for every
+  entry so that a phone can move one account at a time. Where the file goes is the system's own
+  save dialog. Only the two JSON forms carry the groups and the order inside them
 - **Locking**: the vault locks 15 minutes after it opens, and on demand from the settings;
   locking releases the key material and clears the clipboard, and the login screen unlocks it
   again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
   lock before a QR code could be picked out of an image
 
 Not there yet: multiple accounts, master key rotation, Android and iOS.
+
+## Compatibility
+
+**Vault format version 3, sync payload version 3.** This release **cannot synchronize with
+0.1.x**: a payload accepts the current version only, and what comes back is a clear version
+error rather than the "authentication failed" that would send someone looking at their keys.
+Both devices therefore have to be upgraded **together** — 0.1.x reads an mOTP entry as an
+ordinary TOTP and silently loses the PIN and the step, which is exactly what the version bump
+exists to prevent.
+
+Vault files written by version 1 and version 2 still open: the readable set only grows.
 
 ## Building and running
 
