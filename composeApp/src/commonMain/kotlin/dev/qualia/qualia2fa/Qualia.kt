@@ -8,6 +8,7 @@ import dev.qualia.qualia2fa.ffi.FfiDeviceKeys
 import dev.qualia.qualia2fa.ffi.FfiDigits
 import dev.qualia.qualia2fa.ffi.FfiEcLevel
 import dev.qualia.qualia2fa.ffi.FfiEntryKind
+import dev.qualia.qualia2fa.ffi.FfiExportFormat
 import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiImport
@@ -41,6 +42,9 @@ import dev.qualia.qualia2fa.ffi.qrEncode as ffiQrEncode
 import dev.qualia.qualia2fa.ffi.FfiVault
 import dev.qualia.qualia2fa.ffi.FfiVaultEntry
 import dev.qualia.qualia2fa.ffi.coreVersion as ffiCoreVersion
+import dev.qualia.qualia2fa.ffi.exportFormatCarriesGroups as ffiExportFormatCarriesGroups
+import dev.qualia.qualia2fa.ffi.exportFormatExtension as ffiExportFormatExtension
+import dev.qualia.qualia2fa.ffi.exportFormatNeedsPassword as ffiExportFormatNeedsPassword
 import dev.qualia.qualia2fa.ffi.generateSecretBase32 as ffiGenerateSecretBase32
 import dev.qualia.qualia2fa.ffi.importRecoveryKey as ffiImportRecoveryKey
 import dev.qualia.qualia2fa.ffi.totpCode as ffiTotpCode
@@ -277,6 +281,27 @@ class Vault internal constructor(private val inner: FfiVault) {
      */
     fun codeFor(entry: Entry, unixTime: Long): String? =
         entry.counter?.let { counterCode(entry.id, it) } ?: code(entry.id, unixTime)
+
+    /**
+     * Writes the whole vault out in [format], or `null` when it cannot be written.
+     *
+     * The bytes come back rather than being written anywhere: where the file goes is the screen's
+     * decision, and it is the platform's own save dialog that asks.
+     *
+     * **Only [ExportFormat.EncryptedJson] protects anything.** The other three hold every secret
+     * as it stands, because that is what makes them readable by another application. A screen
+     * offering the choice has to say so before the file exists.
+     *
+     * [password] is looked at only by [ExportFormat.EncryptedJson], and there an **empty** string
+     * is refused rather than accepted: a file anybody can open by trying nothing is not protected.
+     * A caller offering that format asks for the password first (see [ExportFormat.needsPassword]).
+     */
+    fun export(format: ExportFormat, password: String? = null): ByteArray? =
+        try {
+            inner.export(format.toFfi(), password)
+        } catch (_: Exception) {
+            null
+        }
 
     /**
      * Moves a counter-based entry to its next counter.
@@ -676,6 +701,63 @@ private fun FfiImportFormat.toFacade(): ImportFormat =
         FfiImportFormat.HTML -> ImportFormat.Html
         FfiImportFormat.TEXT -> ImportFormat.Text
     }
+
+/**
+ * A format the vault can be written out in.
+ *
+ * The four are the shapes another authenticator reads, which is why they are the same four the
+ * import accepts. They are **not equally safe**: only [EncryptedJson] protects anything, and the
+ * other three hold every secret as it stands. The screen that writes one has to say so before the
+ * file exists.
+ */
+enum class ExportFormat {
+    /** One `otpauth://` link per line. Carries no name, no note and no group. */
+    Text,
+
+    /** The JSON export: every field, the groups and their order included. */
+    Json,
+
+    /** The JSON export, locked with a password. */
+    EncryptedJson,
+
+    /**
+     * The HTML export, with a QR code drawn for every entry.
+     *
+     * The picture is what makes this format usable one account at a time - a phone can scan a
+     * row - and it is also why the file is as sensitive as the vault: each code holds that
+     * entry's `otpauth://` URI with its secret.
+     */
+    Html,
+    ;
+
+    /**
+     * Whether this format is written with a password.
+     *
+     * Asked before the file is named, so that the password field appears where it belongs rather
+     * than the refusal arriving afterwards.
+     */
+    val needsPassword: Boolean get() = ffiExportFormatNeedsPassword(toFfi())
+
+    /** The file name extension, without the dot. Both JSON forms share one. */
+    val extension: String get() = ffiExportFormatExtension(toFfi())
+
+    /**
+     * Whether the groups and the order inside them travel with this format.
+     *
+     * Only the two JSON forms carry them. The others keep the order of the entries and lose which
+     * group each one came from, which the screen offering them says rather than leaving the user
+     * to find out after importing the file somewhere else.
+     */
+    val carriesGroups: Boolean get() = ffiExportFormatCarriesGroups(toFfi())
+
+    internal fun toFfi(): FfiExportFormat =
+        when (this) {
+            Text -> FfiExportFormat.TEXT
+            Json -> FfiExportFormat.JSON
+            EncryptedJson -> FfiExportFormat.ENCRYPTED_JSON
+            Html -> FfiExportFormat.HTML
+        }
+}
 
 /**
  * One entry an export contributes, as a preview shows it.

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_cancel
 import dev.qualia.qualia2fa.resources.action_continue
+import dev.qualia.qualia2fa.resources.action_export
 import dev.qualia.qualia2fa.resources.action_export_recovery
 import dev.qualia.qualia2fa.resources.action_import_export
 import dev.qualia.qualia2fa.resources.settings_groups
@@ -137,6 +138,7 @@ fun SettingsScreen(
     var resetting by remember { mutableStateOf(false) }
     var importStep by remember { mutableStateOf<ImportStep?>(null) }
     var importing by remember { mutableStateOf(false) }
+    var exportingVault by remember { mutableStateOf(false) }
     var managingGroups by remember { mutableStateOf(false) }
     val picker = rememberFilePicker()
 
@@ -150,6 +152,7 @@ fun SettingsScreen(
     val openFailed = stringResource(Res.string.error_recovery_open)
     val rejected = stringResource(Res.string.error_recovery_rejected)
     val importExportLabel = stringResource(Res.string.action_import_export)
+    val exportVaultLabel = stringResource(Res.string.action_export)
 
     // The import is a screen rather than a button: it shows what the file holds and asks about the
     // entries that collide before anything is written, and neither fits in a settings row.
@@ -163,6 +166,16 @@ fun SettingsScreen(
             vault = vault,
             onClose = { importing = false },
             onApplied = { onImported(vault) },
+        )
+        return
+    }
+
+    // The same shape as the import above: the formats are not equally safe, and what the user is
+    // choosing between has to be readable in full before a file exists.
+    if (exportingVault) {
+        ExportScreen(
+            vault = vault,
+            onClose = { exportingVault = false },
         )
         return
     }
@@ -244,6 +257,9 @@ fun SettingsScreen(
         SectionCard {
             OutlinedButton(onClick = { importing = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(importExportLabel)
+            }
+            OutlinedButton(onClick = { exportingVault = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(exportVaultLabel)
             }
             OutlinedButton(
                 onClick = { managingGroups = true },

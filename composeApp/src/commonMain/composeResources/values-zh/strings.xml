@@ -115,9 +115,31 @@
     <string name="decision_replace">替换</string>
     <string name="decision_keep_both">都保留</string>
     <string name="import_done">已加入 %1$d 条、替换 %2$d 条、跳过 %3$d 条</string>
+
+    <!-- 导出保险库（在设置里） -->
+    <string name="action_export">导出保险库…</string>
+    <string name="export_title">导出保险库</string>
+    <string name="export_plaintext_warning">只有加密 JSON 有加密保护：其余三种里的每个种子都是明文，请像保管保险库本身一样保管这样的文件。</string>
+    <string name="export_needs_password">需要口令</string>
+    <string name="export_carries_groups">带分组</string>
+    <string name="export_drops_groups">不带分组：条目会回到顶分组</string>
+    <string name="export_text_explainer">每行一个 otpauth:// 链接，不带名称、备注与分组。</string>
+    <string name="export_json_explainer">整份保险库的 JSON，含分组与组内顺序。</string>
+    <string name="export_encrypted_json_explainer">同样的 JSON，用下面的口令加密。四种里只有这一种真正有保护。</string>
+    <string name="export_html_explainer">一张表格，每个条目都画一张二维码；每张码里就是那条目的链接与种子。</string>
+    <string name="export_password_title">这份导出用口令保护</string>
+    <string name="export_password_hint">口令</string>
+    <string name="export_password_required">这种格式需要口令：随便试一下就打得开的导出文件等于没有保护。</string>
+    <string name="export_save_title">保存导出文件</string>
+    <string name="export_filter">导出文件</string>
+    <string name="export_saved">已保存到 %1$s</string>
+    <string name="export_failed">导出没能生成。</string>
+    <string name="export_save_failed">导出文件没能保存。</string>
+
     <string name="format_json">JSON</string>
     <string name="format_html">HTML</string>
     <string name="format_text">纯文本</string>
+    <string name="format_encrypted_json">加密 JSON</string>
     <string name="entry_type_totp">基于时间（TOTP）</string>
     <string name="entry_type_motp">移动令牌（mOTP）</string>
     <string name="entry_type_yandex">Yandex OTP</string>

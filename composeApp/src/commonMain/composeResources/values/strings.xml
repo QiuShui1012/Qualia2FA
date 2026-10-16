@@ -122,9 +122,31 @@
     <string name="decision_replace">Replace</string>
     <string name="decision_keep_both">Keep both</string>
     <string name="import_done">Added %1$d, replaced %2$d, skipped %3$d</string>
+
+    <!-- Exporting the vault, from the settings -->
+    <string name="action_export">Export the vault…</string>
+    <string name="export_title">Export the vault</string>
+    <string name="export_plaintext_warning">Only the encrypted JSON protects anything: the other three hold every secret as it stands, so keep such a file as carefully as the vault itself.</string>
+    <string name="export_needs_password">Needs a password</string>
+    <string name="export_carries_groups">Keeps the groups</string>
+    <string name="export_drops_groups">No groups: the entries return to the top group</string>
+    <string name="export_text_explainer">One otpauth:// link per line, with no name, no note and no group.</string>
+    <string name="export_json_explainer">The whole vault as JSON, the groups and the order inside them included.</string>
+    <string name="export_encrypted_json_explainer">The same JSON, locked with the password below. This is the only one of the four that protects anything.</string>
+    <string name="export_html_explainer">A table with a QR code drawn for every entry; each code holds that entry's link and its secret.</string>
+    <string name="export_password_title">A password protects this export</string>
+    <string name="export_password_hint">Password</string>
+    <string name="export_password_required">This format needs a password: an export that opens by trying nothing protects nothing.</string>
+    <string name="export_save_title">Save the export</string>
+    <string name="export_filter">Export files</string>
+    <string name="export_saved">Saved to %1$s</string>
+    <string name="export_failed">The export could not be written.</string>
+    <string name="export_save_failed">The export could not be saved.</string>
+
     <string name="format_json">JSON</string>
     <string name="format_html">HTML</string>
     <string name="format_text">Text</string>
+    <string name="format_encrypted_json">Encrypted JSON</string>
     <string name="entry_type_totp">Time-based (TOTP)</string>
     <string name="entry_type_motp">Mobile-OTP (mOTP)</string>
     <string name="entry_type_yandex">Yandex OTP</string>

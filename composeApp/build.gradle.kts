@@ -38,8 +38,8 @@ plugins {
 // it through a released version is not testing it at all. The registry stays the default,
 // checksum and all, so an ordinary build still builds exactly what crates.io serves under that
 // version number.
-val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.2.2")
-val ffiCrateSha256 = "10e408322d283075464a5227f465a44ea2f80fc2c08d597bd8b9ecc3fa75025a"
+val ffiCrateVersion = providers.gradleProperty("qualia2fa.ffi.version").getOrElse("0.2.3")
+val ffiCrateSha256 = "7c891dd150b802c72e3b18bf86558f077f7f8905bb6157a9183552fde66125ac"
 val ffiLocalDir = providers.gradleProperty("qualia2fa.ffi.localDir").orNull
 val rustSourceDir = ffiLocalDir?.let { rootProject.file(it) } ?: layout.projectDirectory.dir("rust").asFile
 val rustManifest = rustSourceDir.resolve("Cargo.toml")
@@ -284,7 +284,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qualia2FA"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.0"
 
             // jpackage turns this into the page the installer shows before it copies anything.
             // The packages are x64 and the application requires 64-bit Windows, and nothing in
