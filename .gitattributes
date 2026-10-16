@@ -1,22 +1,24 @@
-# 统一为 LF，避免在 Windows 上签出 CRLF 造成无意义的整文件差异。
+# Store everything with LF, and check it out with LF on every platform.
 #
-# 对 Gradle / Kotlin / Swift 项目尤其重要：Gradle 的构建缓存与增量编译
-# 会因行尾变化而整体失效，一个 CRLF 转换就可能让一次全量重编译。
+# This matters more here than in the Rust repositories: Gradle's build cache and incremental
+# compilation are keyed on file content, so a line-ending change alone can invalidate the whole
+# build.
 * text=auto eol=lf
 
-# 但 Windows 批处理必须保持 CRLF，否则 cmd.exe 解析会出问题。
+# Windows batch files are the one exception: cmd.exe parses them poorly when they use LF,
+# which shows up as a wrapper script that fails on a label it cannot find.
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
-# 二进制资源
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.webp binary
-*.ico binary
-*.ttf binary
-*.otf binary
-*.jar binary
+# Binary resources: no end-of-line conversion, no merge attempts.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.jar   binary
 
-# Gradle wrapper 的 jar 必须按二进制处理
+# The Gradle wrapper jar is a jar like any other, but it is checked in and must stay byte-exact.
 gradle/wrapper/*.jar binary
