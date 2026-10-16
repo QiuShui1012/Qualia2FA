@@ -623,9 +623,10 @@ data class ImportDropped(val icons: Int, val periodsAssumed: Int, val duplicates
 /**
  * What a vault already holds of one imported entry.
  *
- * [identical] means every field matches and there is nothing to decide. Otherwise [existing] names
- * the entries it collides with and [differences] names the fields that differ, so the user can be
- * asked a question with the answer in front of them.
+ * [identical] means every field matches and there is nothing to decide. Otherwise [existing]
+ * holds the **identifiers** of the entries that use the same secret - identifiers rather than
+ * names, because a decision replaces one of them by identifier - and [differences] names the
+ * fields that differ, so the user can be asked a question with the answer in front of them.
  */
 data class ImportMatch(
     val position: Int,

@@ -28,6 +28,7 @@ import dev.qualia.qualia2fa.resources.Res
 import dev.qualia.qualia2fa.resources.action_cancel
 import dev.qualia.qualia2fa.resources.action_continue
 import dev.qualia.qualia2fa.resources.action_export_recovery
+import dev.qualia.qualia2fa.resources.action_import_export
 import dev.qualia.qualia2fa.resources.action_import_recovery
 import dev.qualia.qualia2fa.resources.action_reset
 import dev.qualia.qualia2fa.resources.action_reset_master_key
@@ -134,6 +135,7 @@ fun SettingsScreen(
     var exporting by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
     var importStep by remember { mutableStateOf<ImportStep?>(null) }
+    var importing by remember { mutableStateOf(false) }
     val picker = rememberFilePicker()
 
     val saveTitle = stringResource(Res.string.dialog_save_recovery)
@@ -145,6 +147,18 @@ fun SettingsScreen(
     val saveFailed = stringResource(Res.string.error_recovery_save)
     val openFailed = stringResource(Res.string.error_recovery_open)
     val rejected = stringResource(Res.string.error_recovery_rejected)
+    val importExportLabel = stringResource(Res.string.action_import_export)
+
+    // The import is a screen rather than a button: it shows what the file holds and asks about the
+    // entries that collide before anything is written, and neither fits in a settings row.
+    if (importing) {
+        ImportScreen(
+            vault = vault,
+            onClose = { importing = false },
+            onApplied = { onImported(vault) },
+        )
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(Space.l).verticalScroll(rememberScrollState()),
@@ -217,6 +231,12 @@ fun SettingsScreen(
             }
             savedTo?.let { path ->
                 MessageLine(stringResource(Res.string.message_recovery_saved, path), isError = false)
+            }
+        }
+
+        SectionCard {
+            OutlinedButton(onClick = { importing = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(importExportLabel)
             }
         }
 
