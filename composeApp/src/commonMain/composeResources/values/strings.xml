@@ -87,7 +87,13 @@
     <string name="field_secret">Secret (Base32)</string>
     <string name="field_entry_type">Type</string>
     <string name="entry_type_totp">Time-based (TOTP)</string>
-    <string name="entry_type_hotp">Counter-based (HOTP)</string>
+    <string name="entry_type_motp">Mobile-OTP (mOTP)</string>
+    <string name="entry_type_yandex">Yandex OTP</string>
+    <string name="entry_type_steam">Steam Guard</string>
+    <string name="field_pin">PIN</string>
+    <string name="hint_pin_required">Required: this kind computes its code from a PIN</string>
+    <string name="hint_pin_kept">Leave empty to keep the stored PIN</string>
+<string name="entry_type_hotp">Counter-based (HOTP)</string>
     <string name="field_algorithm">Algorithm</string>
     <string name="field_digits">Digits</string>
     <string name="field_period">Period (seconds)</string>

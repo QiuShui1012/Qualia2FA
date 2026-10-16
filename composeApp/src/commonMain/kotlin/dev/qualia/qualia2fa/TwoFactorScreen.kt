@@ -71,6 +71,9 @@ import dev.qualia.qualia2fa.resources.dialog_delete_selected_title
 import dev.qualia.qualia2fa.resources.dialog_edit_entry
 import dev.qualia.qualia2fa.resources.dialog_import_link
 import dev.qualia.qualia2fa.resources.entry_type_hotp
+import dev.qualia.qualia2fa.resources.entry_type_motp
+import dev.qualia.qualia2fa.resources.entry_type_steam
+import dev.qualia.qualia2fa.resources.entry_type_yandex
 import dev.qualia.qualia2fa.resources.entry_type_totp
 import dev.qualia.qualia2fa.resources.error_entry_not_saved
 import dev.qualia.qualia2fa.resources.error_entry_rejected
@@ -81,6 +84,9 @@ import dev.qualia.qualia2fa.resources.field_account
 import dev.qualia.qualia2fa.resources.field_algorithm
 import dev.qualia.qualia2fa.resources.field_counter
 import dev.qualia.qualia2fa.resources.field_digits
+import dev.qualia.qualia2fa.resources.field_pin
+import dev.qualia.qualia2fa.resources.hint_pin_kept
+import dev.qualia.qualia2fa.resources.hint_pin_required
 import dev.qualia.qualia2fa.resources.field_entry_type
 import dev.qualia.qualia2fa.resources.field_issuer
 import dev.qualia.qualia2fa.resources.field_name
@@ -441,9 +447,10 @@ fun TwoFactorScreen(
                             secretBase32 = form.secretBase32,
                             algorithm = form.algorithm,
                             digits = form.digits,
-                            kind = form.toKind(),
+                            kind = form.kind,
                             note = "",
                             unixTime = currentTimeSeconds(),
+                            pin = form.pin,
                         ) != null
                     } else {
                         vault.updateEntry(
@@ -456,9 +463,10 @@ fun TwoFactorScreen(
                             secretBase32 = form.secretBase32.ifBlank { beingEdited.secretBase32 },
                             algorithm = form.algorithm,
                             digits = form.digits,
-                            kind = form.toKind(),
+                            kind = form.kind,
                             note = beingEdited.note,
                             unixTime = currentTimeSeconds(),
+                            pin = form.pin,
                         )
                     }
 
@@ -761,25 +769,65 @@ private fun FormRow(
 }
 
 /**
- * Which of the two kinds of code an entry is described by.
+ * Which kind of entry the editor is describing.
  *
- * The vault stores no such field: what makes an entry counter-based is the counter it carries,
- * so this is the editor's own name for the choice, and [EntryForm.counter] is where it lands.
+ * Every kind the library stores has a name here, because the editor is where a user creates one:
+ * mOTP, Yandex OTP and Steam Guard compute a different shape of code from the same secret, and an
+ * entry created as an ordinary time-based one would never produce a code that matches.
  */
 private enum class EditorKind {
-    /** TOTP: the code follows the clock, and the entry carries no counter. */
-    TimeBased,
+    /** TOTP: the code follows the clock. */
+    Totp,
 
     /** HOTP: the code follows a counter, which advances when a server consumes a code. */
-    CounterBased,
+    Hotp,
+
+    /** mOTP: MD5 over a ten-second counter, six hexadecimal characters, and a PIN. */
+    Motp,
+
+    /** Yandex OTP: SHA-256, eight lower-case letters, and a PIN. */
+    Yandex,
+
+    /** Steam Guard: SHA-1, five characters, a thirty-second step. */
+    Steam,
+    ;
+
+    /** Whether the scheme itself fixes the code shape, so the editor offers no choices. */
+    val shapeIsFixed: Boolean
+        get() = this == Motp || this == Yandex || this == Steam
+
+    /** Whether this kind computes with a PIN. */
+    val needsPin: Boolean
+        get() = this == Motp || this == Yandex
+
+    /** The step a new entry of this kind starts with. */
+    val defaultPeriodSeconds: Long
+        get() =
+            when (this) {
+                // mOTP defines a ten-second step; the others define thirty.
+                Motp -> MOTP_PERIOD_SECONDS
+                else -> DEFAULT_PERIOD_SECONDS
+            }
+
+    /** The digit count a new entry of this kind carries. */
+    val defaultDigits: Int
+        get() =
+            when (this) {
+                Yandex -> 8
+                Steam -> 5
+                else -> 6
+            }
 }
 
 /**
  * What the entry editor collected, which is exactly what is written to the vault.
  *
- * A value rather than the seven arguments the dialog used to hand over: the two kinds of entry
- * fill the same fields with different meanings, and a caller reading named members cannot
- * mistake the counter for the period.
+ * A value rather than the arguments the dialog used to hand over, so a caller reading named
+ * members cannot mistake one scheme's parameter for another's.
+ *
+ * [pin] is the PIN the user typed, or `null` for "leave the stored one alone". It is never filled
+ * in from the entry being edited: the library does not hand a PIN back, and a form that showed one
+ * would put key material on screen for no reason.
  */
 private data class EntryForm(
     val name: String,
@@ -788,24 +836,15 @@ private data class EntryForm(
     val secretBase32: String,
     val algorithm: OtpAlgorithm,
     val digits: Int,
-    val periodSeconds: Long,
-    /** The counter to store, or `null` for a time-based entry. */
-    val counter: Long?,
-) {
-    /**
-     * The kind the library stores for what this form describes.
-     *
-     * The editor still offers the two kinds it always has - a step or a counter - and the
-     * schemes that compute their own shape of code reach the vault through the importer and
-     * through the model. A counter here is what makes the entry counter-based, which is the same
-     * question [EditorKind] asks.
-     */
-    fun toKind(): EntryKind = counter?.let { EntryKind.Hotp(it) } ?: EntryKind.Totp(periodSeconds)
-}
-
+    val kind: EntryKind,
+    val pin: String?,
+)
 
 /** The counter a new counter-based entry starts at, which is RFC 4226's first counter. */
 private const val DEFAULT_COUNTER = 0L
+
+/** The step mOTP defines, which is ten seconds. */
+private const val MOTP_PERIOD_SECONDS = 10L
 
 /** The editor, for a new entry and for an existing one. */
 @Composable
@@ -820,7 +859,7 @@ private fun EntryDialog(
     var account by remember { mutableStateOf(initial?.account.orEmpty()) }
     // Never filled in from the entry being edited, and never shown back: a secret on screen is
     // a secret in someone's field of view, and nothing about editing the other fields needs
-    // it. Editing therefore offers to *replace* the secret — an empty field leaves the one in
+    // it. Editing therefore offers to *replace* the secret - an empty field leaves the one in
     // the vault alone.
     //
     // The field starts on a single space rather than on nothing, because Material floats an
@@ -830,15 +869,36 @@ private fun EntryDialog(
     // it as empty, and the value is trimmed before it is used.
     var secret by remember { mutableStateOf(" ") }
     var algorithm by remember { mutableStateOf(initial?.algorithm ?: OtpAlgorithm.Sha1) }
-    var digits by remember { mutableStateOf((initial?.digits ?: 6).toString()) }
-    var period by remember { mutableStateOf((initial?.periodSeconds ?: DEFAULT_PERIOD_SECONDS).toString()) }
-    var kind by remember {
-        mutableStateOf(if (initial?.isCounterBased == true) EditorKind.CounterBased else EditorKind.TimeBased)
+    val initialKind =
+        remember(initial) {
+            when (val kind = initial?.kind) {
+                is EntryKind.Totp -> EditorKind.Totp
+                is EntryKind.Hotp -> EditorKind.Hotp
+                is EntryKind.Motp -> EditorKind.Motp
+                is EntryKind.Yandex -> EditorKind.Yandex
+                EntryKind.Steam, null -> if (kind == null) EditorKind.Totp else EditorKind.Steam
+            }
+        }
+    var kind by remember { mutableStateOf(initialKind) }
+    var digits by remember { mutableStateOf((initial?.digits ?: kind.defaultDigits).toString()) }
+    var period by remember {
+        mutableStateOf((initial?.periodSeconds?.takeIf { it > 0 } ?: kind.defaultPeriodSeconds).toString())
     }
     var counter by remember { mutableStateOf((initial?.counter ?: DEFAULT_COUNTER).toString()) }
+    // Empty means "keep the stored PIN" on an entry that has one, and "no PIN yet" on a new one.
+    var pin by remember { mutableStateOf(" ") }
+    val pinIsStored = (initial?.kind as? EntryKind.Motp)?.pinSet == true ||
+        (initial?.kind as? EntryKind.Yandex)?.pinSet == true
 
-    val timeBasedLabel = stringResource(Res.string.entry_type_totp)
-    val counterBasedLabel = stringResource(Res.string.entry_type_hotp)
+    // The labels of the choices are plain values: a resource cannot be read outside composition.
+    val kindLabels =
+        listOf(
+            EditorKind.Totp to stringResource(Res.string.entry_type_totp),
+            EditorKind.Hotp to stringResource(Res.string.entry_type_hotp),
+            EditorKind.Motp to stringResource(Res.string.entry_type_motp),
+            EditorKind.Yandex to stringResource(Res.string.entry_type_yandex),
+            EditorKind.Steam to stringResource(Res.string.entry_type_steam),
+        ).toMap()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -851,7 +911,7 @@ private fun EntryDialog(
             // That arrangement is what keeps the form inside the dialog: a column of six
             // fields is taller than a small window, and whatever does not fit is clipped by
             // the dialog's own surface, which is what "the values inside are not visible"
-            // looks like — a field cut in half by the edge. The scroll is the fallback for a
+            // looks like - a field cut in half by the edge. The scroll is the fallback for a
             // window short enough to defeat even this.
             BoxWithConstraints {
                 val twoColumns = formHasTwoColumns(maxWidth)
@@ -903,22 +963,26 @@ private fun EntryDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    // The kind first, because it decides which of the last two fields is the
-                    // one that means something: a counter for an entry whose server counts, a
-                    // period for one whose code follows the clock.
+                    // The kind first, because it decides which of the fields below mean
+                    // something - and, for three of the kinds, that none of them do: the scheme
+                    // itself fixes the shape of the code.
                     Text(stringResource(Res.string.field_entry_type), style = MaterialTheme.typography.labelLarge)
                     ChoiceRow(
                         options = EditorKind.entries,
                         selected = kind,
-                        // Resolved above rather than here: the label of a choice is a plain
-                        // function, and a resource cannot be read outside composition.
-                        label = {
-                            when (it) {
-                                EditorKind.TimeBased -> timeBasedLabel
-                                EditorKind.CounterBased -> counterBasedLabel
+                        label = { kindLabels.getValue(it) },
+                        onSelect = { selected ->
+                            kind = selected
+                            // The new kind's own defaults, unless the user has typed something
+                            // that still applies: a step and a digit count that belong to the
+                            // kind being left would create an entry nobody asked for.
+                            if (selected.shapeIsFixed || !kind.shapeIsFixed) {
+                                digits = selected.defaultDigits.toString()
+                                if (selected != EditorKind.Hotp) {
+                                    period = selected.defaultPeriodSeconds.toString()
+                                }
                             }
                         },
-                        onSelect = { kind = it },
                         modifier = Modifier.fillMaxWidth(),
                     )
 
@@ -934,24 +998,21 @@ private fun EntryDialog(
                     )
 
                     FormRow(twoColumns) {
-                        OutlinedTextField(
-                            value = digits,
-                            onValueChange = { digits = it },
-                            label = { Text(stringResource(Res.string.field_digits)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
+                        // The three schemes that define their own code shape define their digit
+                        // count with it, so the field is not offered: a free field there would
+                        // let a user save a Yandex entry with six digits, which produces codes
+                        // that never match.
+                        if (!kind.shapeIsFixed) {
+                            OutlinedTextField(
+                                value = digits,
+                                onValueChange = { digits = it },
+                                label = { Text(stringResource(Res.string.field_digits)) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                         when (kind) {
-                            EditorKind.TimeBased ->
-                                OutlinedTextField(
-                                    value = period,
-                                    onValueChange = { period = it },
-                                    label = { Text(stringResource(Res.string.field_period)) },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                )
-
-                            EditorKind.CounterBased ->
+                            EditorKind.Hotp ->
                                 OutlinedTextField(
                                     value = counter,
                                     onValueChange = { counter = it },
@@ -959,7 +1020,37 @@ private fun EntryDialog(
                                     singleLine = true,
                                     modifier = Modifier.weight(1f),
                                 )
+
+                            // Steam Guard's step is thirty seconds by definition, so there is
+                            // nothing to ask.
+                            EditorKind.Steam -> Unit
+
+                            else ->
+                                OutlinedTextField(
+                                    value = period,
+                                    onValueChange = { period = it },
+                                    label = { Text(stringResource(Res.string.field_period)) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                )
                         }
+                    }
+
+                    if (kind.needsPin) {
+                        OutlinedTextField(
+                            value = pin,
+                            onValueChange = { pin = it },
+                            label = { Text(stringResource(Res.string.field_pin)) },
+                            singleLine = true,
+                            supportingText = {
+                                Text(
+                                    stringResource(
+                                        if (pinIsStored) Res.string.hint_pin_kept else Res.string.hint_pin_required,
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
 
                     TextButton(onClick = { secret = Qualia.newSecret() }) {
@@ -969,24 +1060,29 @@ private fun EntryDialog(
             }
         },
         confirmButton = {
-            // Nothing is defaulted on the way out: a digit count that is not one of the
-            // three the scheme has, a period that is not a positive number, or a counter that
-            // is not a whole number keeps Save disabled instead of quietly becoming something
-            // else. Only the field of the kind in effect is checked, because the other one is
-            // not on screen and so could not be corrected.
+            // Nothing is defaulted on the way out: a digit count the core cannot produce, a
+            // period that is not a positive number, a counter that is not a whole number or a
+            // missing PIN keeps Save disabled instead of quietly becoming something else.
             val digitCount = digits.toIntOrNull()
             val periodSeconds = period.toLongOrNull()
             val counterValue = counter.toLongOrNull()
+            val digitCountIsAcceptable =
+                if (kind.shapeIsFixed) true else digitCount != null && digitCount in 1..9
             // A blank secret is a value only when there is one to keep: adding an entry needs
             // one, editing an entry leaves the current one alone.
             val acceptable =
                 (initial != null || secret.isNotBlank()) &&
-                    digitCount != null &&
-                    digitCount in 6..8 &&
+                    digitCountIsAcceptable &&
                     when (kind) {
-                        EditorKind.TimeBased -> periodSeconds != null && periodSeconds > 0
-                        EditorKind.CounterBased -> counterValue != null && counterValue >= 0
-                    }
+                        EditorKind.Hotp -> counterValue != null && counterValue >= 0
+                        EditorKind.Steam -> true
+                        else -> periodSeconds != null && periodSeconds > 0
+                    } &&
+                    // A PIN is required when it is the first one; an entry that has one keeps it
+                    // when the field is left empty.
+                    (!kind.needsPin || pinIsStored || pin.isNotBlank())
+
+            val pinValue = pin.trim().takeIf { it.isNotEmpty() }
 
             Button(
                 onClick = {
@@ -997,17 +1093,24 @@ private fun EntryDialog(
                             account = account,
                             secretBase32 = secret.trim().uppercase(),
                             algorithm = algorithm,
-                            digits = requireNotNull(digitCount),
-                            // A counter-based entry advances by counter, so its time step means
-                            // nothing: what is written is the field's own value when it still
-                            // holds one, and otherwise the scheme's default that the core's own
-                            // convention keeps there.
-                            periodSeconds =
+                            digits = if (kind.shapeIsFixed) kind.defaultDigits else requireNotNull(digitCount),
+                            kind =
                                 when (kind) {
-                                    EditorKind.TimeBased -> requireNotNull(periodSeconds)
-                                    EditorKind.CounterBased -> periodSeconds?.takeIf { it > 0 } ?: DEFAULT_PERIOD_SECONDS
+                                    EditorKind.Totp -> EntryKind.Totp(requireNotNull(periodSeconds))
+                                    EditorKind.Hotp -> EntryKind.Hotp(requireNotNull(counterValue))
+                                    EditorKind.Motp ->
+                                        EntryKind.Motp(
+                                            periodSeconds = periodSeconds?.takeIf { it > 0 } ?: MOTP_PERIOD_SECONDS,
+                                            pinSet = pinIsStored || pinValue != null,
+                                        )
+                                    EditorKind.Yandex ->
+                                        EntryKind.Yandex(
+                                            periodSeconds = periodSeconds?.takeIf { it > 0 } ?: DEFAULT_PERIOD_SECONDS,
+                                            pinSet = pinIsStored || pinValue != null,
+                                        )
+                                    EditorKind.Steam -> EntryKind.Steam
                                 },
-                            counter = if (kind == EditorKind.CounterBased) requireNotNull(counterValue) else null,
+                            pin = pinValue,
                         ),
                     )
                 },

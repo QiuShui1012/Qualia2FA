@@ -5,6 +5,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * The three HMAC algorithms, through the whole chain.
@@ -271,6 +272,107 @@ class AlgorithmTest {
         }
     }
 
+    /**
+     * Each kind produces its own shape of code, and a PIN survives an unrelated edit.
+     *
+     * The exact values belong to the core, which checks them against the schemes' own vectors.
+     * What is checked here is what the boundary decides: an entry created as one kind is not
+     * computed as another - mOTP is six hexadecimal characters over a ten-second counter, Yandex
+     * OTP is eight lower-case letters, Steam Guard is five characters - and a PIN the library
+     * never hands back is still the one being used after an update that did not supply it.
+     */
+    @Test
+    fun eachKindKeepsItsOwnShapeOfCodeAndItsPin() {
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()))
+        val secret = "JBSWY3DPEHPK3PXP"
+
+        val motp =
+            assertNotNull(
+                vault.addEntry(
+                    name = "mOTP",
+                    issuer = "Qualia",
+                    account = "appendix",
+                    secretBase32 = secret,
+                    algorithm = OtpAlgorithm.Sha1,
+                    digits = 6,
+                    kind = EntryKind.Motp(periodSeconds = 10, pinSet = true),
+                    note = "",
+                    unixTime = 1_700_000_000,
+                    pin = "1234",
+                ),
+                "an mOTP entry must be accepted",
+            )
+        val motpCode = assertNotNull(vault.code(motp, 1_700_000_000), "mOTP must produce a code")
+        assertEquals(6, motpCode.length, "mOTP is six characters")
+        assertTrue(motpCode.all { it in "0123456789abcdef" }, "mOTP is hexadecimal: $motpCode")
+
+        val yandex =
+            assertNotNull(
+                vault.addEntry(
+                    name = "Yandex",
+                    issuer = "Qualia",
+                    account = "appendix",
+                    secretBase32 = secret,
+                    algorithm = OtpAlgorithm.Sha256,
+                    digits = 8,
+                    kind = EntryKind.Yandex(periodSeconds = 30, pinSet = true),
+                    note = "",
+                    unixTime = 1_700_000_000,
+                    pin = "1234",
+                ),
+                "a Yandex OTP entry must be accepted",
+            )
+        val yandexCode = assertNotNull(vault.code(yandex, 1_700_000_000), "Yandex OTP must produce a code")
+        assertEquals(8, yandexCode.length, "Yandex OTP is eight characters")
+        assertTrue(yandexCode.all { it in 'a'..'z' }, "Yandex OTP is lower-case letters: $yandexCode")
+
+        val steam =
+            assertNotNull(
+                vault.addEntry(
+                    name = "Steam",
+                    issuer = "Qualia",
+                    account = "appendix",
+                    secretBase32 = secret,
+                    algorithm = OtpAlgorithm.Sha1,
+                    digits = 5,
+                    kind = EntryKind.Steam,
+                    note = "",
+                    unixTime = 1_700_000_000,
+                ),
+                "a Steam Guard entry must be accepted",
+            )
+        assertEquals(
+            5,
+            assertNotNull(vault.code(steam, 1_700_000_000), "Steam Guard must produce a code").length,
+            "Steam Guard is five characters",
+        )
+
+        // The library reports that a PIN is set and never the PIN itself; an update that supplies
+        // none keeps the stored one, which is what lets a note be edited without asking for it.
+        val stored = assertNotNull(vault.entries().firstOrNull { it.id == motp }, "the entry must be there")
+        assertTrue((stored.kind as EntryKind.Motp).pinSet, "the entry must report that a PIN is set")
+        assertTrue(
+            vault.updateEntry(
+                id = motp,
+                name = "mOTP (renamed)",
+                issuer = "Qualia",
+                account = "appendix",
+                secretBase32 = stored.secretBase32,
+                algorithm = OtpAlgorithm.Sha1,
+                digits = 6,
+                kind = EntryKind.Motp(periodSeconds = 10, pinSet = true),
+                note = "",
+                unixTime = 1_700_000_060,
+                pin = null,
+            ),
+            "the update must be accepted",
+        )
+        assertEquals(
+            motpCode,
+            assertNotNull(vault.code(motp, 1_700_000_000), "the code must still be computable"),
+            "keeping the PIN must keep the code",
+        )
+    }
     /**
      * An independent TOTP: RFC 4226 §5.3's truncation over RFC 6238 §4.2's counter, with the
      * JDK's HMAC. [secret] is the raw key, already decoded. The code is cut to the eight

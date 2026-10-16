@@ -80,7 +80,13 @@
     <string name="field_secret">种子（Base32）</string>
     <string name="field_entry_type">类型</string>
     <string name="entry_type_totp">基于时间（TOTP）</string>
-    <string name="entry_type_hotp">基于计数器（HOTP）</string>
+    <string name="entry_type_motp">移动令牌（mOTP）</string>
+    <string name="entry_type_yandex">Yandex OTP</string>
+    <string name="entry_type_steam">Steam 令牌</string>
+    <string name="field_pin">PIN</string>
+    <string name="hint_pin_required">必填：这种条目用 PIN 参与计算</string>
+    <string name="hint_pin_kept">留空表示保留已设置的 PIN</string>
+<string name="entry_type_hotp">基于计数器（HOTP）</string>
     <string name="field_algorithm">算法</string>
     <string name="field_digits">位数</string>
     <string name="field_period">周期（秒）</string>
