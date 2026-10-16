@@ -200,6 +200,13 @@ jobs:
           cat > notes.md <<'NOTES'
           Qualia2FA, the desktop and Android application.
 
+          **Upgrade every device together.** This version writes vault format 3 and sync
+          payload 3, and it cannot synchronize with 0.1.x at all: a payload accepts the current
+          version only, so what comes back is a version error rather than a failed
+          authentication. An older device reads an mOTP entry as an ordinary TOTP and silently
+          loses its PIN and its step, which is exactly what the version bump prevents. Vault
+          files written by version 1 and version 2 still open.
+
           | Platform | Artifact | Notes |
           |---|---|---|
           | Android 8.0+ (64-bit ARM) | `Qualia2FA-v<version>-arm64.apk` | signed with the project's release key |
@@ -299,6 +306,13 @@ jobs:
           fi
           cat > notes.md <<'NOTES'
           Qualia2FA, the desktop and Android application.
+
+          **Upgrade every device together.** This version writes vault format 3 and sync
+          payload 3, and it cannot synchronize with 0.1.x at all: a payload accepts the current
+          version only, so what comes back is a version error rather than a failed
+          authentication. An older device reads an mOTP entry as an ordinary TOTP and silently
+          loses its PIN and its step, which is exactly what the version bump prevents. Vault
+          files written by version 1 and version 2 still open.
 
           | Platform | Artifact | Notes |
           |---|---|---|
