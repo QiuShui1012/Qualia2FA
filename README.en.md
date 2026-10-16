@@ -49,15 +49,19 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 - **Entries**: add, edit and delete by hand, import one from an `otpauth://` QR code in an
   image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
   because the tombstone reaches every device the account syncs with. An entry is either
-  time-based or counter-based, chosen in the editor, and a link or a QR code imported brings
-  the kind it declares with it
+  **five kinds** can be created: time-based, counter-based, mOTP, Yandex OTP and Steam Guard.
+  The last three compute a different shape of code each, and the editor computes the one that
+  was chosen. mOTP and Yandex OTP need a PIN, and it is **write-only**: the interface says one
+  is set and never shows it. A link or a QR code imported brings the kind it declares with it
 - **Codes**: live display, one-click copy (the clipboard is cleared again after 30 seconds, and
   only if it still holds what was copied). A time-based entry counts its step down and shows the
   ring; a counter-based one shows the counter its code belongs to and moves to the next one from
   **next code**, which is what a server that consumed a code expects. All three HMAC algorithms
   are supported — SHA-1, SHA-256 and SHA-512 — chosen in the entry editor and carried in from the
   `algorithm` parameter when a link or a QR code is imported (SHA-1 being what the
-  `otpauth://` scheme itself means when it says nothing)
+  `otpauth://` scheme itself means when it says nothing). mOTP produces six hexadecimal
+  characters, Yandex OTP eight lower-case letters and Steam Guard five characters: the scheme
+  fixes the shape, so the editor does not offer a digit count or a step for those three
 - **Pairing**: started from the sync screen; the pairing code, the request and the answer all
   take the same code path a sync code does — one symbol when the payload fits, several shown in
   turn when it does not, collected one by one as they are read — and the text always stays
@@ -75,6 +79,13 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   identity actually have, recovery key import and export, and locking now
 - **Recovery keys**: export (the passphrase is typed twice) and import (replacing this
   device's vault is confirmed first, then the passphrase is asked for)
+- **Importing**: "Import from another app" in the settings reads what another authenticator
+  exported — JSON, HTML, or one `otpauth://` link per line, and an encrypted JSON asks for its
+  password. It **shows before it writes**: the entries the file holds, the rows that could not
+  be used and what could not be carried across are shown first, and only then is anything
+  written. An entry the vault already holds unchanged is skipped; an entry that uses the same
+  secret but differs always asks — replace, skip, add, or keep both is the user's call, never
+  the reader's
 - **Locking**: the vault locks 15 minutes after it opens, and on demand from the settings;
   locking releases the key material and clears the clipboard, and the login screen unlocks it
   again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
