@@ -183,4 +183,69 @@ class QualiaTest {
         )
         assertEquals(2, vault.entryCount, "the vault still holds exactly what it held")
     }
+    /**
+     * A group keeps the order it is given, and removing one keeps its entries.
+     *
+     * The second half is the part worth a test: "remove group" reads like "remove what is in it",
+     * and the boundary decides the opposite. An entry whose group was removed returns to the top
+     * group, where the user can still see it and copy its codes.
+     */
+    @Test
+    fun groupsKeepTheirOrderAndOutliveTheirRemoval() {
+        val vault = assertNotNull(Qualia.createLocalVault(MemoryStore()))
+        val secret = "JBSWY3DPEHPK3PXP"
+        fun add(name: String): String =
+            assertNotNull(
+                vault.addEntry(
+                    name = name,
+                    issuer = "Qualia",
+                    account = "test",
+                    secretBase32 = secret,
+                    algorithm = OtpAlgorithm.Sha1,
+                    digits = 6,
+                    kind = EntryKind.Totp(30),
+                    note = "",
+                    unixTime = 1_700_000_000,
+                ),
+                "$name must be accepted",
+            )
+
+        val first = add("First")
+        val second = add("Second")
+
+        val groupId = assertNotNull(vault.createGroup("Work"), "a group must be created")
+        val groups = vault.groups()
+        assertEquals(2, groups.size, "the top group and the new one")
+        assertTrue(groups[0].top, "the top group comes first")
+        assertEquals("Work", groups[1].name)
+        assertTrue(
+            groups[0].entryIds.containsAll(listOf(first, second)),
+            "a new entry starts in the top group: ${groups[0].entryIds}",
+        )
+
+        assertTrue(vault.assignToGroup(first, groupId), "the first entry must move")
+        assertTrue(vault.assignToGroup(second, groupId), "the second entry must move")
+        assertEquals(groupId, vault.groupOf(first), "the entry must report its group")
+
+        assertEquals(
+            listOf(first, second),
+            vault.groups().single { it.id == groupId }.entryIds,
+            "a group keeps the order entries were put in",
+        )
+        assertTrue(vault.setOrdering(groupId, listOf(second, first)), "the order must be writable")
+        assertEquals(
+            listOf(second, first),
+            vault.groups().single { it.id == groupId }.entryIds,
+            "the order that was written is the order that is read back",
+        )
+
+        assertTrue(vault.removeGroup(groupId), "the group must be removable")
+        assertEquals(1, vault.groups().size, "only the top group is left")
+        assertEquals(2, vault.entryCount, "removing a group must not remove its entries")
+        assertEquals(
+            vault.groups().first().id,
+            vault.groupOf(first),
+            "the entry returns to the top group",
+        )
+    }
 }

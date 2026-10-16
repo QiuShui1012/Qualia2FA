@@ -11,6 +11,7 @@ import dev.qualia.qualia2fa.ffi.FfiEntryKind
 import dev.qualia.qualia2fa.ffi.FfiFrameCollector
 import dev.qualia.qualia2fa.ffi.FfiException
 import dev.qualia.qualia2fa.ffi.FfiImport
+import dev.qualia.qualia2fa.ffi.FfiGroup
 import dev.qualia.qualia2fa.ffi.FfiImportChoice
 import dev.qualia.qualia2fa.ffi.FfiImportDecision
 import dev.qualia.qualia2fa.ffi.FfiImportFormat
@@ -373,6 +374,95 @@ class Vault internal constructor(private val inner: FfiVault) {
         }
     }
 
+    /**
+     * The groups, the top group first and then the named ones in the order they are shown in.
+     *
+     * Sorted here rather than left to the caller: the library numbers the top group and the first
+     * named group both zero, so sorting every group by that number alone would leave the top
+     * group's place to a tie-break.
+     */
+    fun groups(): List<Group> =
+        try {
+            inner.groups().map {
+                Group(
+                    id = it.id,
+                    name = it.name,
+                    order = it.order.toInt(),
+                    top = it.top,
+                    entryIds = it.entryIds,
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /** The identifier of the group [entryId] is in, or `null` when the entry does not exist. */
+    fun groupOf(entryId: String): String? =
+        try {
+            inner.groupOf(entryId)
+        } catch (_: Exception) {
+            null
+        }
+
+    /** Creates a named group and returns its identifier, or `null` when the name is refused. */
+    fun createGroup(name: String): String? =
+        try {
+            inner.createGroup(name)
+        } catch (_: Exception) {
+            null
+        }
+
+    /** Renames a group. The top group has no name and cannot be renamed. */
+    fun renameGroup(groupId: String, name: String): Boolean =
+        try {
+            inner.renameGroup(groupId, name)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Moves a group to [position] among the **named** groups, counted from zero, and shifts the
+     * others: the numbers are an order, not values a caller may leave gaps in.
+     */
+    fun moveGroup(groupId: String, position: Int): Boolean =
+        try {
+            inner.moveGroup(groupId, position.toULong())
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Removes a group. Its entries are **not** removed: they return to the top group, which is
+     * what makes removing a group a tidying action rather than a destructive one.
+     */
+    fun removeGroup(groupId: String): Boolean =
+        try {
+            inner.removeGroup(groupId)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /** Writes the order of the entries in one group. Every entry of the group must be listed. */
+    fun setOrdering(groupId: String, entryIds: List<String>): Boolean =
+        try {
+            inner.setOrdering(groupId, entryIds)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+    /** Moves one entry into a group. */
+    fun assignToGroup(entryId: String, groupId: String): Boolean =
+        try {
+            inner.assignToGroup(entryId, groupId)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
     /** Removes an entry. Returns false when there was nothing to remove. */
     fun removeEntry(id: String, unixTime: Long): Boolean =
         try {
@@ -613,6 +703,26 @@ data class ImportedEntry(
 
 /** A row the reader could not use, and why. The reason never quotes a secret. */
 data class ImportProblem(val position: Int, val reason: String)
+
+/**
+ * A group of entries.
+ *
+ * A group is an **ordered** collection, not a set: the order is what the user arranged, it is
+ * synchronized between devices, and two devices that arranged the same group differently is a
+ * conflict the sync screen has to show. The top group holds the entries that belong to no named
+ * group, and its name is empty.
+ *
+ * [order] is the library's own numbering, in which the top group and the first named group are
+ * both zero - the top group stands outside the named sequence. Consumers therefore sort by
+ * "top first, then by [order]", which is the order [Vault.groups] already returns.
+ */
+data class Group(
+    val id: String,
+    val name: String,
+    val order: Int,
+    val top: Boolean,
+    val entryIds: List<String>,
+)
 
 /** A group the export carries. */
 data class ImportedGroup(val id: String, val name: String)
