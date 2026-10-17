@@ -11,10 +11,24 @@ English version: [README.en.md](README.en.md).
 
 | 项 | 值 |
 |---|---|
-| 平台 | Windows 桌面（已实现）；Android、iOS 计划中 |
+| 平台 | Windows 桌面与 Android（都出安装包）；Linux、iOS、macOS 计划中 |
 | 界面 | Compose Multiplatform |
 | 界面语言 | 英文（默认）、中文 |
+| 界面主题 | 跟随系统的浅色 / 深色 |
 | 许可证 | Apache-2.0 |
+
+## 安装
+
+每个版本都发布在 [Releases](https://github.com/Qualia2FA/Qualia2FA/releases) 页面上：
+
+| 平台 | 产物 | 说明 |
+|---|---|---|
+| Windows 10 / 11（x64） | `.msi`（安装）与 `.exe`（免安装） | 带签名，但证书是自签发的，Windows 会警告「未知发布者」 |
+| Android 8.0 及以上（64 位 ARM） | `.apk` | 用项目的发布密钥签名，可直接安装 |
+
+Android 端只出 `arm64-v8a` 一个架构的包。安装后不需要账号，也不需要联网：相机权限只在打开扫码
+时才问，拒绝了也还有「选一张二维码图片」这条路；局域网权限只在配对与同步界面打开时才会用到。
+应用不申请任何后台权限，也不做后台同步。
 
 ## 设计取向
 
@@ -27,10 +41,11 @@ English version: [README.en.md](README.en.md).
 
 ## 当前状态
 
-**开发早期，目前只有 Windows 桌面端。** 已经能用的部分：
+**开发早期，目前支持 Windows 桌面端与 Android，两个平台是同一套界面与同一套逻辑。** 已经能用的部分：
 
 - **界面**：进入程序先是加载界面（标志、名称、加载环；窗口变窄时环移到下方，变矮时先去
-  掉名称、再去掉环），随后是没有密钥时的登录界面，或者主界面
+  掉名称、再去掉环），随后是没有密钥时的登录界面，或者主界面。配色跟随系统的浅色 / 深色
+  设置（见「界面主题」）
 - **主界面**：2FA、同步、设置三个界面共用一套导航，横屏时导航在左侧、竖屏时在底部，当前
   界面高亮；每个界面都按窗口尺寸调整布局
 - **首次运行**：创建保险库（设备身份交给平台密钥库；主密钥由平台密钥库中一把**不可导出**的
@@ -73,7 +88,7 @@ English version: [README.en.md](README.en.md).
 - **锁定**：打开 15 分钟后自动锁，也可以在设置里立即锁定；锁定时主密钥材料被释放、剪贴板
   被清空，回到登录界面可以解锁。**失焦不锁**：文件对话框会让窗口失焦，那样连二维码都选不完
 
-还没有的：多账号、主密钥轮换、Android 与 iOS。
+还没有的：多账号、主密钥轮换、iOS 与 Linux / macOS 桌面端。
 
 ## 兼容性
 
@@ -110,6 +125,9 @@ cd Qualia2FA
 ./gradlew :composeApp:assembleDebug    # Android 调试包，只用来验证功能
 ```
 
+Android 的产物在 `composeApp/build/outputs/apk/release/`，装到设备上是
+`adb install -r composeApp/build/outputs/apk/release/composeApp-release.apk`。
+
 要在设备上看这个应用是什么样，请用 `assembleRelease`：**Android 拒绝优化 debuggable 的
 包**，debug 构建因此天生慢好几倍，拿它判断流畅度会得出与用户所见相反的结论。
 `assembleRelease` 需要签名才能安装，签名信息从仓库根目录的 `keystore.properties`（不
@@ -120,8 +138,9 @@ SHA-256 校验后解包进 git 忽略的 `composeApp/rust/`。换版本时**必�
 `ffiCrateSha256`**：只改版本号会在校验那一步失败，这是故意的，它挡住了「版本号写着新、
 实际拿到旧包」这类静默错配。
 
-每次推送都会在 GitHub Actions 上跑一遍同样的构建：先跑单元测试，再构建 Windows 的 MSI
-与 EXE 安装包，产物挂在那次运行的页面上。
+每次推送都会在 GitHub Actions 上跑一遍同样的构建：Windows 那一侧跑单元测试并打出 MSI 与 EXE，
+Android 那一侧打出 arm64 的 APK，产物都挂在那次运行的页面上。打 `v*` 标签时另有一次发布构建，
+三个产物一并传到新建的 Release 上。
 
 要单独构建某一层，进它自己的仓库里做：
 
@@ -136,16 +155,17 @@ cargo test --all-targets        # QualiaTransport
 
 ```
 composeApp/
-├── src/commonMain/             界面与业务代码（Kotlin，跨平台）
+├── src/commonMain/             界面与业务代码（Kotlin，两个平台共用）
 │   ├── composeResources/       标志与图标（drawable/），界面文案：values/ 英文（默认）、values-zh/ 中文
 │   └── kotlin/dev/qualia/qualia2fa/
 │       ├── Layout.kt           按窗口尺寸决定布局的规则，写成纯函数以便测试
-│       ├── Theme.kt            取色、圆角与间距：色板来自标志本身（#EAF2F4 与 #091012）
+│       ├── Theme.kt            两套配色（浅色 / 深色）、圆角与间距：色板来自标志本身（#EAF2F4 与 #091012）
 │       └── *Screen.kt          加载、登录、2FA、同步、设置，以及配对的两侧
 ├── src/androidJvmMain/         桌面端与 Android 共用：保险库文件，以及写在它旁边的包裹后主密钥
 ├── src/jvmMain/                桌面端实现：数据目录、文件对话框、窗口
-├── src/androidMain/            Android 实现：Activity、相机、文件选择器
-└── src/jvmTest/                单元测试
+├── src/androidMain/            Android 实现：Activity、相机、文件选择器、局域网，以及窗口主题
+│   └── res/values-night/       深色下的窗口底色与系统栏图标
+└── src/jvmTest/                单元测试（含两套配色的对比度）
 ```
 
 `Qualia.kt` 是全仓唯一 import 生成绑定的文件：界面只看到普通的 Kotlin 值，绑定层要换、
@@ -158,6 +178,20 @@ composeApp/
 
 `icons/` 下是打包用的 `.ico`（Windows 安装包与窗口图标），由 `icons/make_ico.py` 从
 标志重新生成。
+
+## 界面主题
+
+浅色与深色两套配色，**跟随系统设置**，应用内不再提供自己的开关——用户已经有了那个设置，再放
+一个只会与它打架。
+
+两套配色是同一个标志的两种读法：浅色是白底黑线（底色 `#EAF2F4`、线条 `#091012`），深色把这两
+个色**对调**——线色当底、底色当线——次级表面与错误红都由这两个色推出来，没有引入第三种颜色。
+对比度是**算出来的**而不是看出来的：`ThemeTest` 把界面上真会出现的每一对前景 / 背景都按
+WCAG 2.1 算一遍，两套配色都要达到 AA（4.5:1）；任何一处调色调到读不清，测试会先于用户发现。
+
+两个平台**读到系统设置的时刻**不同，这是各自的工具包决定的：Android 会在应用运行期间收到配置
+变更，所以在系统设置里切换主题是立刻生效的；Windows 上的桌面工具包是在创建窗口时读一次系统
+主题，因此运行中切换要**下次启动**才生效。
 
 ## 界面语言
 

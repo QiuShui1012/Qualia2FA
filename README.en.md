@@ -11,10 +11,27 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 
 | Item | Value |
 |---|---|
-| Platforms | Windows desktop (implemented); Android and iOS are planned |
+| Platforms | Windows desktop and Android, both with installers; Linux, iOS and macOS are planned |
 | UI | Compose Multiplatform |
 | Interface languages | English (default), Chinese |
+| Interface theme | Follows the system's light or dark setting |
 | License | Apache-2.0 |
+
+## Installing
+
+Every version is published on the [Releases](https://github.com/Qualia2FA/Qualia2FA/releases)
+page:
+
+| Platform | Artifacts | Notes |
+|---|---|---|
+| Windows 10 / 11 (x64) | `.msi` (installer) and `.exe` (portable) | Signed, but with a self-signed certificate, so Windows warns about an unknown publisher |
+| Android 8.0 and above (64-bit ARM) | `.apk` | Signed with the project's release key, installable as it is |
+
+The Android build ships one architecture, `arm64-v8a`. The application needs no account and no
+network: the camera is asked for only when the scanner is opened, and declining it still leaves
+the way in that picks an image of a code; the local network is used only while the pairing and
+sync screens are open. It asks for no background permissions and syncs nothing in the
+background.
 
 ## Design choices
 
@@ -30,11 +47,13 @@ signed in to the same account can share 2FA entries directly, and merging takes 
 
 ## Current state
 
-**Early development, Windows desktop only so far.** What already works:
+**Early development. Windows desktop and Android are supported, and they are one interface over
+one set of decisions.** What already works:
 
 - **The screens**: the application opens on a loading screen (mark, name, ring; a narrow
   window moves the ring underneath, a short one drops the name and then the ring), then
-  either the login screen, when there is no key on this device, or the main screens
+  either the login screen, when there is no key on this device, or the main screens. The
+  colours follow the system's light or dark setting (see "Interface theme")
 - **The main screens**: 2FA, sync and settings share one navigation — a rail down the left
   in landscape, a bar across the bottom in portrait, with the current screen highlighted —
   and every screen rearranges itself for the window it is in
@@ -97,7 +116,7 @@ signed in to the same account can share 2FA entries directly, and merging takes 
   again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
   lock before a QR code could be picked out of an image
 
-Not there yet: multiple accounts, master key rotation, Android and iOS.
+Not there yet: multiple accounts, master key rotation, iOS, and the Linux / macOS desktops.
 
 ## Compatibility
 
@@ -136,6 +155,9 @@ cd Qualia2FA
 ./gradlew :composeApp:assembleDebug    # Android debug package, for checking behaviour only
 ```
 
+The Android package is written to `composeApp/build/outputs/apk/release/`, and installing it on
+a device is `adb install -r composeApp/build/outputs/apk/release/composeApp-release.apk`.
+
 To see what this application is like on a device, use `assembleRelease`: **Android refuses to
 optimize a debuggable package**, so a debug build is several times slower by construction and
 judging smoothness from one gives the opposite of what a user sees. `assembleRelease` needs a
@@ -149,8 +171,10 @@ unpacked into the git-ignored `composeApp/rust/`. When the version changes, **`f
 has to change with it**: changing only the version number fails at that check, which is
 deliberate — it stops "the number says new, the package is old" from passing silently.
 
-Every push runs the same build on GitHub Actions: the unit tests first, then the Windows MSI
-and EXE installers, which are attached to that run.
+Every push runs the same build on GitHub Actions: the Windows side runs the unit tests and
+produces the MSI and the EXE, the Android side produces the arm64 APK, and all of them are
+attached to that run. A `v*` tag runs the release build instead, which publishes the three
+artifacts on a new Release.
 
 To build one layer on its own, work inside its own repository:
 
@@ -165,16 +189,17 @@ cargo test --all-targets        # QualiaTransport
 
 ```
 composeApp/
-├── src/commonMain/             UI and business code (Kotlin, multiplatform)
+├── src/commonMain/             UI and business code (Kotlin, shared by both platforms)
 │   ├── composeResources/       The mark and the icons (drawable/), interface text: values/ English (default), values-zh/ Chinese
 │   └── kotlin/dev/qualia/qualia2fa/
 │       ├── Layout.kt           What each window size shows, written as pure functions so they can be tested
-│       ├── Theme.kt            Colours, corners and spacing: the palette is the mark's own (#EAF2F4 and #091012)
+│       ├── Theme.kt            Both colour schemes (light and dark), corners and spacing: the palette is the mark's own (#EAF2F4 and #091012)
 │       └── *Screen.kt          Loading, login, 2FA, sync, settings, and both sides of pairing
 ├── src/androidJvmMain/         What the desktop and Android builds share: the vault file, and the wrapped master key beside it
 ├── src/jvmMain/                Desktop implementation: the data directory, file dialogs, the window
-├── src/androidMain/            Android implementation: the activity, the camera, the file picker
-└── src/jvmTest/                Unit tests
+├── src/androidMain/            Android implementation: the activity, the camera, the file picker, the local network, the window theme
+│   └── res/values-night/       The window colour and the system bar icons in the dark theme
+└── src/jvmTest/                Unit tests (including the contrast of both colour schemes)
 ```
 
 `Qualia.kt` is the only file in the repository that imports the generated bindings: the UI
@@ -189,6 +214,26 @@ reports which backend answered — `tpm`, `android-keystore` or `software`.
 
 `icons/` holds the `.ico` used for packaging (the Windows installer and the window icon); it
 is regenerated from the mark by `icons/make_ico.py`.
+
+## Interface theme
+
+Two colour schemes, light and dark, **following the system setting**. There is no switch of our
+own inside the application: the user already has that setting, and a second one could only
+disagree with it.
+
+The two schemes are the same mark read twice. Light is the plate with the ink drawn on it
+(`#EAF2F4` under `#091012`); dark **swaps those two** — the ink becomes the background and the
+plate becomes what is drawn on it — and the secondary surfaces and the error red are derived
+from the same two tones rather than from a third colour. Contrast is **computed, not judged by
+eye**: `ThemeTest` runs every foreground/background pair the interface actually draws through
+the WCAG 2.1 formula and requires AA (4.5:1) from both schemes, so a colour tweak that makes
+something unreadable fails a test before it reaches a user.
+
+The two platforms **read the system setting at different moments**, which is their toolkits'
+doing rather than a choice here: Android delivers the configuration change to the running
+application, so switching the theme in the system settings takes effect immediately; the
+desktop toolkit reads the system theme once, when the window is created, so a change while the
+application is open takes effect at the next start.
 
 ## Interface languages
 
