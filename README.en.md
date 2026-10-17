@@ -1,45 +1,60 @@
+<div align="center" style="align-items: center">
+
+<img src=".idea/icon.svg" alt="icon" style="height: 128px; width: 128px">
+
 # Qualia2FA
 
-![Qualia2FA](docs/qualia2fa_logo.svg)
+[简体中文](README.md) | English
 
 A **serverless, non-realtime** multi-platform two-factor authentication (2FA) app.
 
-中文版见 [README.md](README.md).
+[![License](https://img.shields.io/github/license/Qualia2FA/Qualia2FA?label=License)][License]
+[![Releases](https://img.shields.io/github/downloads/Qualia2FA/Qualia2FA/total?logo=github&label=Downloads)][Releases]
+
+[License]: LICENSE
+
+[Releases]: https://github.com/Qualia2FA/Qualia2FA/releases
+
+</div>
+
+---
 
 Each device runs on its own: no vendor server, no account, no master password. Devices
 signed in to the same account can share 2FA entries directly, and merging takes the union.
 
-| Item                | Value                                                                               |
-|---------------------|-------------------------------------------------------------------------------------|
-| Platforms           | Windows desktop and Android, both with installers; Linux, iOS and macOS are planned |
-| UI                  | Compose Multiplatform                                                               |
-| Interface languages | English (default), Chinese                                                          |
-| Interface theme     | Follows the system's light or dark setting                                          |
-| License             | Apache-2.0                                                                          |
+| Item                | Value                                      |
+|---------------------|--------------------------------------------|
+| Platforms           | Windows and Android                        |
+| UI                  | Compose Multiplatform                      |
+| Interface languages | English (default), Simplified Chinese      |
+| Interface theme     | Follows the system's light or dark setting |
+| License             | Apache-2.0                                 |
 
 ## Installing
 
 Every version is published on the [Releases](https://github.com/Qualia2FA/Qualia2FA/releases)
 page:
 
-| Platform                           | Artifacts                                | Notes                                                                                   |
-|------------------------------------|------------------------------------------|-----------------------------------------------------------------------------------------|
-| Windows 10 / 11 (x64)              | `.msi` (installer) and `.exe` (portable) | Signed, but with a self-signed certificate, so Windows warns about an unknown publisher |
-| Android 8.0 and above (64-bit ARM) | `.apk`                                   | Signed with the project's release key, installable as it is                             |
+| Platform                           | Artifacts                       | Notes                                                                                   |
+|------------------------------------|---------------------------------|-----------------------------------------------------------------------------------------|
+| Windows 10 / 11 (x64)              | `.msi` and `.exe` offline installers | Signed, but with a self-signed certificate, so Windows warns about an unknown publisher |
+| Android 8.0 and above (64-bit ARM) | `.apk`                          | Signed with the project's release key, installable as it is                             |
 
-The Android build ships one architecture, `arm64-v8a`. The application needs no account and no
-network: the camera is asked for only when the scanner is opened, and declining it still leaves
-the way in that picks an image of a code; the local network is used only while the pairing and
-sync screens are open. It asks for no background permissions and syncs nothing in the
-background.
+The Android build currently ships only the `arm64-v8a` architecture, and the Windows build
+only `x86_64`. Pull requests are very welcome.
+
+After installing, no account and no network are needed.
+The camera permission is requested only when a scan is needed, and declining it still leaves
+the option to scan an image of a QR code; the local network permission is used only for
+pairing or syncing.
+The app asks for no background permissions and does not sync in the background.
 
 ## Design choices
 
-- **No centre.** No server, no account system, no "forgot password" flow. Your keys live
-  only on your own devices.
-- **No realtime sync.** Devices share on demand instead of reconciling in the background,
-  so "sync conflict" is not a category of problem here, and a server outage cannot keep
-  you from a verification code.
+- **No centre.** No server, no traditional account system, no "forgot password" flow. Your
+  keys live only on your own devices.
+- **No realtime sync.** Devices share on demand instead of syncing in the background, so a
+  server outage cannot keep you from a verification code.
 - **End-to-end encryption.** Entries are encrypted before they leave the device, so no
   intermediary on the sharing channel ever sees plaintext.
 - **Works offline.** Everything keeps working without a network, including code
@@ -48,98 +63,36 @@ background.
 ## Current state
 
 **Early development. Windows desktop and Android are supported, and they are one interface over
-one set of decisions.** What already works:
+one set of decisions.**
 
-- **The screens**: the application opens on a loading screen (mark, name, ring; a narrow
-  window moves the ring underneath, a short one drops the name and then the ring), then
-  either the login screen, when there is no key on this device, or the main screens. The
-  colours follow the system's light or dark setting (see "Interface theme")
-- **The main screens**: 2FA, sync and settings share one navigation — a rail down the left
-  in landscape, a bar across the bottom in portrait, with the current screen highlighted —
-  and every screen rearranges itself for the window it is in
-- **First run**: create a vault (the device identity goes to the platform key store, and the
-  master key is protected by a key the platform key store holds and never hands out, so what
-  is written beside the vault file is the **wrapped** form; the store is reported as it is —
-  TPM, Android Keystore or software), or log in by pairing with a device that is already
-  unlocked. A device that already holds a master key is only offered unlocking and logging in:
-  creating a vault there would replace that key. When the vault cannot be opened at all — the
-  key no longer unwraps it, or the file is gone — that screen offers a reset instead, which
-  says what it deletes and asks before it acts
-- **Entries**: add, edit and delete by hand, import one from an `otpauth://` QR code in an
-  image, or paste an `otpauth://` link; selection mode deletes several at once, after asking,
-  because the tombstone reaches every device the account syncs with. An entry is either
-  **five kinds** can be created: time-based, counter-based, mOTP, Yandex OTP and Steam Guard.
-  The last three compute a different shape of code each, and the editor computes the one that
-  was chosen. mOTP and Yandex OTP need a PIN, and it is **write-only**: the interface says one
-  is set and never shows it. A link or a QR code imported brings the kind it declares with it
-- **Codes**: live display, one-click copy (the clipboard is cleared again after 30 seconds, and
-  only if it still holds what was copied). A time-based entry counts its step down and shows the
-  ring; a counter-based one shows the counter its code belongs to and moves to the next one from
-  **next code**, which is what a server that consumed a code expects. All three HMAC algorithms
-  are supported — SHA-1, SHA-256 and SHA-512 — chosen in the entry editor and carried in from the
-  `algorithm` parameter when a link or a QR code is imported (SHA-1 being what the
-  `otpauth://` scheme itself means when it says nothing). mOTP produces six hexadecimal
-  characters, Yandex OTP eight lower-case letters and Steam Guard five characters: the scheme
-  fixes the shape, so the editor does not offer a digit count or a step for those three
-- **Pairing**: started from the sync screen; the pairing code, the request and the answer all
-  take the same code path a sync code does — one symbol when the payload fits, several shown in
-  turn when it does not, collected one by one as they are read — and the text always stays
-  underneath the code
-- **Syncing**: two devices show one code each, one direction at a time; wherever the two
-  disagree, the user decides entry by entry
-- **On the same WiFi or hotspot**: pairing requests and sync payloads no longer have to be
-  carried by hand — the two devices find each other and the request and the reply travel over
-  the local network themselves. The QR code is still the pairing's **out-of-band anchor**: the
-  first pairing still takes one scan, which pins down which device the other side is, and the
-  LAN only saves the carrying afterwards. The LAN channel is **opened on demand**: a screen
-  that needs it opens one and closes it on the way out, nothing syncs in the background, and
-  nothing is announced while no screen is using it
-- **Settings**: the interface language, the protection the master key and the device
-  identity actually have, recovery key import and export, and locking now
-- **Recovery keys**: export (the passphrase is typed twice) and import (replacing this
-  device's vault is confirmed first, then the passphrase is asked for)
-- **Importing**: "Import from another app" in the settings reads what another authenticator
-  exported — JSON, HTML, or one `otpauth://` link per line, and an encrypted JSON asks for its
-  password. It **shows before it writes**: the entries the file holds, the rows that could not
-  be used and what could not be carried across are shown first, and only then is anything
-  written. An entry the vault already holds unchanged is skipped; an entry that uses the same
-  secret but differs always asks — replace, skip, add, or keep both is the user's call, never
-  the reader's
-- **Exporting**: "Export" writes the whole vault in one of the four formats another
-  authenticator reads — one link per line, JSON, encrypted JSON, or an HTML table. **Only the
-  encrypted JSON takes a password, and only it is encrypted**: the other three are plaintext,
-  which the screen says before a format is picked, and the HTML form draws a QR code for every
-  entry so that a phone can move one account at a time. Where the file goes is the system's own
-  save dialog. Only the two JSON forms carry the groups and the order inside them
-- **Locking**: the vault locks 15 minutes after it opens, and on demand from the settings;
-  locking releases the key material and clears the clipboard, and the login screen unlocks it
-  again. **Losing focus does not lock**: the file dialog is a window of its own, so that would
-  lock before a QR code could be picked out of an image
+The core functionality is essentially complete. What remains is:
 
-Not there yet: multiple accounts, master key rotation, iOS, and the Linux / macOS desktops.
+- **App password**:
 
-## Compatibility
+  Require identity verification when unlocking the app, for further security.
+  Device biometrics will be integrated; otherwise a separate password has to be set.
 
-**Vault format version 3, sync payload version 3.** This release **cannot synchronize with
-0.1.x**: a payload accepts the current version only, and what comes back is a clear version
-error rather than the "authentication failed" that would send someone looking at their keys.
-Both devices therefore have to be upgraded **together** — 0.1.x reads an mOTP entry as an
-ordinary TOTP and silently loses the PIN and the step, which is exactly what the version bump
-exists to prevent.
+- **Removing devices & master key rotation**:
 
-Vault files written by version 1 and version 2 still open: the readable set only grows.
+  A device can be removed once it is discarded or no longer trusted.
+  Because of how the application is designed, this needs **every** device on the same account
+  that has not been removed to run one full sync before the device is gone completely.
+
+- **Linux, iOS and macOS support**:
+
+  Support for devices on those three platforms.
+  The author (@QiuShui1012) has no Apple device and has not joined the developer programme, so
+  the plans for the latter two are indefinitely delayed.
+  **Apple developers are welcome to join!**
 
 ## Building and running
 
-This repository has **no submodules**. Each Rust layer is developed in its own repository
-and published to crates.io; the app side depends on them by version:
-
-| crate | Contents | License |
-|---|---|---|
-| `qualia-dik` | Device identity primitives (representation, fingerprint, verification) and the platform-native hardware keystores; the only crate allowed to use `unsafe` | LGPL-3.0-or-later |
-| `qualia2fa-core` | All cryptography, the vault format, the sync and pairing protocols. No I/O, no clock, no `unsafe` | LGPL-3.0-or-later |
-| `qualia2fa-ffi` | UniFFI bindings (Kotlin / Swift) plus the binding generator | LGPL-3.0-or-later |
-| `qualia-transport` | Transport channels: the QR half (capacity model, encoding, rendering, text envelope, image decoding) and the LAN half (multicast discovery, connection records, a QUIC data plane) are both implemented | LGPL-3.0-or-later |
+| crate              | Contents                                                                                                                                                 | License            |
+|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| `qualia-dik`       | Device identity primitives (representation, fingerprint, verification) and the platform-native hardware keystores; the only library crate allowed to use `unsafe` | LGPL-3.0-or-later |
+| `qualia-transport` | Transport channels: QR support (capacity model, encoding/decoding, rendering, text envelope) and LAN support (multicast discovery, connection records, a QUIC data plane), both implemented | LGPL-3.0-or-later |
+| `qualia2fa-core`   | All cryptography, the vault format, the sync and pairing protocols. No I/O, no clock, no `unsafe`                                                       | LGPL-3.0-or-later |
+| `qualia2fa-ffi`    | UniFFI bindings (Kotlin / Swift) plus the binding generator                                                                                              | LGPL-3.0-or-later |
 
 Building needs JDK 21 and a Rust toolchain (MSVC on Windows):
 
@@ -158,7 +111,7 @@ cd Qualia2FA
 The Android package is written to `composeApp/build/outputs/apk/release/`, and installing it on
 a device is `adb install -r composeApp/build/outputs/apk/release/composeApp-release.apk`.
 
-To see what this application is like on a device, use `assembleRelease`: **Android refuses to
+To check what the application looks like on a device, use `assembleRelease`: **Android refuses to
 optimize a debuggable package**, so a debug build is several times slower by construction and
 judging smoothness from one gives the opposite of what a user sees. `assembleRelease` needs a
 signature to be installable and reads it from a `keystore.properties` beside the repository root,
@@ -203,9 +156,9 @@ composeApp/
 ```
 
 `Qualia.kt` is the only file in the repository that imports the generated bindings: the UI
-sees ordinary Kotlin values, so replacing, patching or forking the binding layer touches that
-one file. The two features that must not cross that line — the entry list, and where the
-master key is kept — are wrapped there as well.
+sees ordinary Kotlin values, so replacing, patching or forking the binding layer should touch
+only that one file. The two features that must not cross that line — the entry list, and where
+the master key is kept — are wrapped there as well.
 
 The master key itself is never written anywhere: a key-encryption key is generated inside the
 platform key store, never leaves it, and what the data directory holds is the bytes it
