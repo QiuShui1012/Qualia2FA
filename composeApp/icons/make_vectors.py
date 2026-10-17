@@ -31,6 +31,7 @@ Two details of the format are worth knowing when reading the output:
   one path, which is what the source's own grouping meant.
 """
 
+import math
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -54,13 +55,22 @@ NAMES = {
 # Where the drawables are committed, relative to this script.
 DEFAULT_OUTPUT = "../src/commonMain/composeResources/drawable"
 
-# The resource the application mark becomes, and the launcher layer generated from it.
+# The size a drawing is declared at, where the number of its own coordinates is not a size on
+# screen. The mark is written in a box of 900 units because that is how its coordinates are
+# spelled, not because the interface ever shows it 900dp across: it is drawn at 96dp beside a
+# title, at 32dp next to one, and as the window icon, so the resource declares 90dp.
+SIZES = {
+    "logo": 90.0,
+}
+
+# The resource the application mark becomes, and the two launcher layers generated from it.
 MARK = "qualia2fa_logo"
 LAUNCHER = "../src/androidMain/res/drawable/ic_launcher_foreground.xml"
+LAUNCHER_MONOCHROME = "../src/androidMain/res/drawable/ic_launcher_monochrome.xml"
 
-# The box an adaptive icon is drawn in, and the part of it a launcher is obliged to show.
+# The box an adaptive icon is drawn in, and the circle of it a launcher guarantees to show.
 LAUNCHER_BOX = 108.0
-LAUNCHER_SAFE = 72.0
+LAUNCHER_SAFE = 66.0
 
 # The styles a drawing can carry over from an ancestor. Everything else is rejected.
 INHERITED = ("fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin")
@@ -260,20 +270,27 @@ def path_elements(shapes):
     return lines
 
 
-def document(size, viewport_width, viewport_height, shapes, group=()):
+def document(size, viewport_width, viewport_height, shapes, group=(), header=()):
     """One vector drawable as its XML text.
 
     [group] is the attributes of a `<group>` the paths are wrapped in, as `(name, value)`
-    pairs; with none, the paths sit directly in the view port.
+    pairs; with none, the paths sit directly in the view port. [header] is a comment written
+    above the drawing, as a sequence of lines.
     """
-    lines = [
-        '<?xml version="1.0" encoding="utf-8"?>',
-        '<vector xmlns:android="http://schemas.android.com/apk/res/android"',
-        f'    android:width="{number(size)}dp"',
-        f'    android:height="{number(size)}dp"',
-        f'    android:viewportWidth="{number(viewport_width)}"',
-        f'    android:viewportHeight="{number(viewport_height)}">',
-    ]
+    lines = ['<?xml version="1.0" encoding="utf-8"?>']
+    if header:
+        lines.append("<!--")
+        lines.extend(f"  {line}".rstrip() for line in header)
+        lines.append("-->")
+    lines.extend(
+        [
+            '<vector xmlns:android="http://schemas.android.com/apk/res/android"',
+            f'    android:width="{number(size)}dp"',
+            f'    android:height="{number(size)}dp"',
+            f'    android:viewportWidth="{number(viewport_width)}"',
+            f'    android:viewportHeight="{number(viewport_height)}">',
+        ]
+    )
     if group:
         lines.append("    <group")
         lines.extend(f'        android:{name}="{value}"' for name, value in group)
@@ -294,7 +311,7 @@ def write(target, text):
     target.write_text(text, encoding="utf-8", newline="\n")
 
 
-def convert(source, target, default_size):
+def convert(source, target, default_size, declared_size=None):
     """Convert one SVG file into a vector drawable at [target]."""
     root = ET.parse(source).getroot()
     if root.get("transform") is not None:
@@ -310,7 +327,11 @@ def convert(source, target, default_size):
     if not shapes:
         raise ValueError("the drawing has no shapes")
 
-    size = root.get("width") or root.get("height") or f"{number(default_size)}dp"
+    size = (
+        f"{number(declared_size)}dp"
+        if declared_size is not None
+        else (root.get("width") or root.get("height") or f"{number(default_size)}dp")
+    )
     # A size in SVG is in user units, which are the pixels of the drawing and not the pixels
     # of a screen: Android's own unit for a drawable's intrinsic size is the dp, so `24px`
     # and a bare `24` both become `24dp` and the icon keeps its size at every density.
@@ -331,28 +352,134 @@ def convert(source, target, default_size):
     return shapes, width
 
 
-def launcher_layer(shapes, viewport, target):
-    """Write the mark as the foreground layer of the adaptive launcher icon.
+def content_radius(shapes, viewport):
+    """How far the drawing's line work reaches from its centre, in the drawing's own units.
 
-    The layer is the 108-unit box an adaptive icon is drawn in, and a launcher is only
-    obliged to show the middle 72 units of it: the mark is scaled into those and centred, so
-    a mask that is a circle, a squircle or anything else crops the plate rather than the
-    drawing. The background layer is the plate colour, which the mark's own plate covers.
+    Only the **stroked** shapes are measured: a filled plate covers the whole box by
+    definition and says nothing about where the drawing ends. Their coordinates are read in
+    pairs, which is what the commands a line drawing is made of - `M`, `L` and `C` - all take;
+    a shape written with `H`, `V` or an arc would not read as pairs, and the conversion fails
+    rather than scaling the drawing to a distance that is not its own.
+
+    A curve is measured at its control points, which lie on or outside it, so the circle this
+    returns is never smaller than the drawing and the launcher icon is never scaled up past
+    what a mask shows.
     """
-    scale = LAUNCHER_SAFE / viewport
-    offset = (LAUNCHER_BOX - LAUNCHER_SAFE) / 2
+    centre = viewport / 2
+    far = 0.0
+    for paint, data in shapes:
+        if not any(name == "strokeColor" for name, _ in paint):
+            continue
+        numbers = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", data)]
+        if len(numbers) % 2:
+            raise ValueError(
+                f"the mark's line work ({data[:24]}...) is not written as x,y pairs, so the "
+                "launcher icon cannot be scaled to it"
+            )
+        for x, y in zip(numbers[::2], numbers[1::2]):
+            far = max(far, math.hypot(x - centre, y - centre))
+    if far == 0.0:
+        raise ValueError("the mark has no stroked shape to measure")
+    return far
+
+
+def launcher_shapes(shapes):
+    """The shapes as the launcher icon draws them: the line work in one weight.
+
+    The mark draws its frame heavier than its letters, and that reads as intended when it is
+    drawn a hundred pixels across and more. A launcher draws the icon as small as 48 pixels,
+    where the letters are two or three pixels wide and a lighter stroke stops being a lighter
+    stroke and becomes grey - the drawing looks out of focus rather than delicate. The launcher
+    layers therefore draw every stroke at the heaviest width the mark itself uses, so each part
+    of the mark survives the smallest size a launcher puts it at. The drawing in the interface
+    keeps the two weights.
+    """
+    widths = [float(dict(paint)["strokeWidth"]) for paint, _ in shapes if "strokeWidth" in dict(paint)]
+    if not widths:
+        return shapes
+    heaviest = max(widths)
+    return [
+        (
+            tuple(
+                ("strokeWidth", number(heaviest)) if name == "strokeWidth" else (name, value)
+                for name, value in paint
+            ),
+            data,
+        )
+        for paint, data in shapes
+    ]
+
+
+def launcher_layers(shapes, viewport, foreground, monochrome, source):
+    """Write the mark as the two layers of the adaptive launcher icon.
+
+    A launcher draws those layers in a box of 108 units and is only obliged to show the middle
+    66 of them - a circle, in effect - so the drawing is scaled until its farthest point sits
+    on that circle and is then centred in the box. Scaling it to the 72-unit **square** instead
+    leaves the corners of the drawing outside the circle, and a launcher whose mask rounds them
+    off cuts them: the icon then reads as a drawing running off its own tile.
+
+    The foreground keeps the mark's plate, which is the colour of the background layer and
+    therefore invisible on it; the monochrome layer is the line work alone, because a themed
+    launcher supplies the background and tints whatever alpha it is given.
+    """
+    scale = LAUNCHER_SAFE / (2 * content_radius(shapes, viewport))
+    offset = (LAUNCHER_BOX - viewport * scale) / 2
+    group = (
+        ("scaleX", number(scale)),
+        ("scaleY", number(scale)),
+        ("translateX", number(offset)),
+        ("translateY", number(offset)),
+    )
+    circle = 2 * content_radius(shapes, viewport)
+    drawn = launcher_shapes(shapes)
+    line_work = [shape for shape in drawn if any(name == "strokeColor" for name, _ in shape[0])]
+    generated = (
+        f"Generated by icons/make_vectors.py from {source.name}; edit that file and run the",
+        "script rather than editing this one.",
+    )
+
     write(
-        target,
+        foreground,
         document(
             LAUNCHER_BOX,
             LAUNCHER_BOX,
             LAUNCHER_BOX,
-            shapes,
-            (
-                ("scaleX", number(scale)),
-                ("scaleY", number(scale)),
-                ("translateX", number(offset)),
-                ("translateY", number(offset)),
+            drawn,
+            group,
+            header=generated
+            + (
+                "",
+                "The mark on the layer the launcher masks. A launcher draws this in a box of 108",
+                f"units and is only obliged to show the middle {LAUNCHER_SAFE:g} of them, and the",
+                "farthest thing in the drawing from its own centre is the corner of the frame,",
+                f"{content_radius(shapes, viewport):g} of the drawing's {viewport:g} units away. The",
+                f"drawing is therefore scaled by {LAUNCHER_SAFE:g}/{circle:g} and centred, which puts",
+                "the whole mark inside that circle. Scaling it to the 72-unit square instead is",
+                "what leaves the frame's corners outside the circle, where a mask with round",
+                "corners cuts them off and the icon reads as a drawing running off its own tile.",
+                "",
+                "Every stroke is drawn at the heaviest width the mark uses: at the sizes a",
+                "launcher draws this, a lighter stroke is not a lighter stroke but a grey one.",
+                "The plate is part of the drawing and is the same colour as the background layer,",
+                "so on a masked launcher the two are one surface.",
+            ),
+        ),
+    )
+    write(
+        monochrome,
+        document(
+            LAUNCHER_BOX,
+            LAUNCHER_BOX,
+            LAUNCHER_BOX,
+            line_work,
+            group,
+            header=generated
+            + (
+                "",
+                "The mark as a themed launcher draws it. Only the line work is here: the launcher",
+                "supplies the background and tints whatever alpha it is given, so the plate would",
+                "become a filled square. The geometry is the foreground's.",
             ),
         ),
     )
@@ -377,11 +504,17 @@ def main():
 
     for drawing in drawings:
         name = NAMES.get(drawing.stem, drawing.stem)
-        shapes, viewport = convert(drawing, target / f"{name}.xml", default_size)
+        shapes, viewport = convert(
+            drawing, target / f"{name}.xml", default_size, SIZES.get(drawing.stem)
+        )
         print(f"{drawing.name} -> {name}.xml: {len(shapes)} shape(s)")
         if name == MARK:
-            launcher_layer(shapes, viewport, Path(__file__).parent / LAUNCHER)
-            print(f"    and {Path(LAUNCHER).name}, the mark in the {LAUNCHER_BOX:g}-unit icon box")
+            here = Path(__file__).parent
+            launcher_layers(shapes, viewport, here / LAUNCHER, here / LAUNCHER_MONOCHROME, drawing)
+            print(
+                f"    and {Path(LAUNCHER).name} with {Path(LAUNCHER_MONOCHROME).name}, the mark "
+                f"on the {LAUNCHER_SAFE:g}-unit circle a launcher shows"
+            )
 
 
 if __name__ == "__main__":

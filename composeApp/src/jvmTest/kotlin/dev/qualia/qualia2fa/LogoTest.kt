@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * read as the mark, and nothing in between that is neither.
  */
 class LogoTest {
-    /** Side length of the raster the mark is drawn into; its own view box is 90. */
+    /** Side length of the raster the mark is drawn into; its own view box is 900. */
     private val size = 110
 
     @Test
