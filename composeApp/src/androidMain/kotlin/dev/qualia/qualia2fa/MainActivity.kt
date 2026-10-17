@@ -1,5 +1,7 @@
 package dev.qualia.qualia2fa
 
+import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import java.nio.file.Path
 
 /**
@@ -46,6 +49,11 @@ import java.nio.file.Path
  * interface is built for a window that changes shape, and recreating the activity would take
  * the vault's in-memory state with it while the user is reading a code.
  *
+ * A theme change is one of those handled changes, and the window background is the one part
+ * of it the composition cannot reach: the strip behind the system bars is the platform's, and
+ * the platform resolves it when the window is created. [onConfigurationChanged] therefore
+ * re-applies it from the same resource the window theme uses.
+ *
  * # Why the Rust library is loaded here
  *
  * The device identity is a key in the platform keystore, and the platform keystore is reached
@@ -80,5 +88,21 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * Re-applies the window background for the configuration that just arrived.
+     *
+     * The window background is a resource of the platform's theme and is resolved when the
+     * window is created. This activity handles a theme change itself rather than being
+     * recreated, so what is behind the composition would otherwise keep the background of the
+     * theme it was created in. It is read from the same resource the window theme uses, so the
+     * two cannot drift apart.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        window.setBackgroundDrawable(
+            ColorDrawable(ContextCompat.getColor(this, R.color.window_background)),
+        )
     }
 }

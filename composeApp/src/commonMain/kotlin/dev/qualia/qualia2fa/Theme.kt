@@ -1,12 +1,15 @@
 package dev.qualia.qualia2fa
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -39,6 +42,22 @@ import androidx.compose.ui.unit.dp
  * change while it is open is followed immediately; on the desktop the toolkit reads the
  * system theme when the window is created, so a change is picked up at the next start.
  *
+ * # Why the theme paints a background
+ *
+ * The content is drawn on a [Surface] of the scheme's own background rather than on whatever
+ * is behind the window, and that is load-bearing in two ways.
+ *
+ * A `Text` that is not inside a surface takes its color from Material's default content
+ * color, which is **black** — invisible in the light scheme only because the plate happens to
+ * be nearly white, and unreadable in the dark one. The surface is what makes plain text
+ * readable in both.
+ *
+ * And the window behind the composition is a resource of the **platform's** theme, resolved
+ * when the window is created. On Android the activity handles a configuration change itself
+ * (recreating it would throw away the vault's in-memory state), so a window that was created
+ * in the light theme keeps its light background while the composition switches to the dark
+ * one. Painting the background here is what keeps the two from disagreeing.
+ *
  * # Shapes
  *
  * Rounded, and generously: the mark's plate is a rounded square whose corner radius is about
@@ -47,11 +66,18 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun QualiaTheme(content: @Composable () -> Unit) {
+    val colors = if (isSystemInDarkTheme()) QualiaDarkColors else QualiaLightColors
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) QualiaDarkColors else QualiaLightColors,
+        colorScheme = colors,
         shapes = QualiaShapes,
-        content = content,
-    )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = colors.background,
+            contentColor = colors.onBackground,
+            content = content,
+        )
+    }
 }
 
 /** The plate of the mark: the background everything sits on. */
