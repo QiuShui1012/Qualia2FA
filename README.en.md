@@ -9,23 +9,23 @@ A **serverless, non-realtime** multi-platform two-factor authentication (2FA) ap
 Each device runs on its own: no vendor server, no account, no master password. Devices
 signed in to the same account can share 2FA entries directly, and merging takes the union.
 
-| Item | Value |
-|---|---|
-| Platforms | Windows desktop and Android, both with installers; Linux, iOS and macOS are planned |
-| UI | Compose Multiplatform |
-| Interface languages | English (default), Chinese |
-| Interface theme | Follows the system's light or dark setting |
-| License | Apache-2.0 |
+| Item                | Value                                                                               |
+|---------------------|-------------------------------------------------------------------------------------|
+| Platforms           | Windows desktop and Android, both with installers; Linux, iOS and macOS are planned |
+| UI                  | Compose Multiplatform                                                               |
+| Interface languages | English (default), Chinese                                                          |
+| Interface theme     | Follows the system's light or dark setting                                          |
+| License             | Apache-2.0                                                                          |
 
 ## Installing
 
 Every version is published on the [Releases](https://github.com/Qualia2FA/Qualia2FA/releases)
 page:
 
-| Platform | Artifacts | Notes |
-|---|---|---|
-| Windows 10 / 11 (x64) | `.msi` (installer) and `.exe` (portable) | Signed, but with a self-signed certificate, so Windows warns about an unknown publisher |
-| Android 8.0 and above (64-bit ARM) | `.apk` | Signed with the project's release key, installable as it is |
+| Platform                           | Artifacts                                | Notes                                                                                   |
+|------------------------------------|------------------------------------------|-----------------------------------------------------------------------------------------|
+| Windows 10 / 11 (x64)              | `.msi` (installer) and `.exe` (portable) | Signed, but with a self-signed certificate, so Windows warns about an unknown publisher |
+| Android 8.0 and above (64-bit ARM) | `.apk`                                   | Signed with the project's release key, installable as it is                             |
 
 The Android build ships one architecture, `arm64-v8a`. The application needs no account and no
 network: the camera is asked for only when the scanner is opened, and declining it still leaves
