@@ -221,8 +221,8 @@ android {
         // encoding of a sync code: both are API 26.
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.2.1"
+        versionCode = 6
+        versionName = "0.2.2"
 
         ndk.abiFilters += setOf("arm64-v8a")
     }
@@ -284,7 +284,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qualia2FA"
-            packageVersion = "0.2.1"
+            packageVersion = "0.2.2"
 
             // jpackage turns this into the page the installer shows before it copies anything.
             // The packages are x64 and the application requires 64-bit Windows, and nothing in
