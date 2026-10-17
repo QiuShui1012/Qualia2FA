@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The same window in the system's dark theme: the parent is the platform's dark Material
+  theme, the background is the ink rather than the plate, and the system bars are asked for
+  light icons because what is behind them is now dark.
+
+  This is what matches the composition: `QualiaTheme` reads the platform's own answer
+  (`isSystemInDarkTheme`), so the window and what is drawn in it are chosen by the same
+  setting and cannot disagree.
+-->
+<resources>
+    <style name="Theme.Qualia2FA" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorBackground">@color/window_background</item>
+    </style>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The night variant of the window colors: the mark's two tones with their roles swapped, so
+  that the window the composition is drawn in is the ink rather than a flash of the plate.
+
+  Only the window follows the system theme. The launcher icon is drawn in `plate` and `ink`
+  (see the light file), which have no night variant on purpose: an icon is the application's
+  face rather than a surface inside it.
+-->
+<resources>
+    <color name="window_background">@color/ink</color>
+</resources>

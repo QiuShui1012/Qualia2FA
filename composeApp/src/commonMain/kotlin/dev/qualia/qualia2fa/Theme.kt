@@ -1,8 +1,10 @@
 package dev.qualia.qualia2fa
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -20,6 +22,23 @@ import androidx.compose.ui.unit.dp
  * two-tone drawing and adding a brand color would be inventing one. The only other color
  * is the deep red for errors, which is a signal rather than a style.
  *
+ * # The dark scheme is those two tones with their roles swapped
+ *
+ * It is not a second palette: the ink becomes the background and the plate becomes what is
+ * drawn on it, so the two schemes are the same drawing read in both directions. Everything
+ * around them is derived the same way it is in the light scheme — a surface lifted off the
+ * background (`Raised`, `RaisedMore`), secondary text pulled toward it (`MutedPlate`), and
+ * the same red lightened until it reads on a dark surface rather than a second hue.
+ *
+ * # Which scheme is used
+ *
+ * The platform's answer, [isSystemInDarkTheme]: the user already has that setting, and a
+ * second one inside the application would only be able to disagree with it. The two
+ * platforms differ in **when** they read it, and that is the toolkits' doing rather than a
+ * choice here: on Android the configuration is delivered to the running application, so a
+ * change while it is open is followed immediately; on the desktop the toolkit reads the
+ * system theme when the window is created, so a change is picked up at the next start.
+ *
  * # Shapes
  *
  * Rounded, and generously: the mark's plate is a rounded square whose corner radius is about
@@ -29,7 +48,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun QualiaTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = QualiaColors,
+        colorScheme = if (isSystemInDarkTheme()) QualiaDarkColors else QualiaLightColors,
         shapes = QualiaShapes,
         content = content,
     )
@@ -50,8 +69,20 @@ private val MutedInk = Color(0xFF44545A)
 /** A deep red for errors: dark enough to read as "stop" without introducing a second hue. */
 private val Alert = Color(0xFF8C1D18)
 
-/** The color scheme, built from the mark. */
-private val QualiaColors =
+/** The ink lifted just enough to be told apart from the background it sits on. */
+private val Raised = Color(0xFF16232A)
+
+/** The ink lifted further, for a selected row or a secondary surface on a dark background. */
+private val RaisedMore = Color(0xFF22333A)
+
+/** The plate pulled toward the ink: secondary text on a dark surface. */
+private val MutedPlate = Color(0xFFA6BABF)
+
+/** The same red, lightened until it reads on a dark surface. */
+private val AlertOnDark = Color(0xFFFFB4AB)
+
+/** The light scheme, built from the mark. */
+internal val QualiaLightColors =
     lightColorScheme(
         primary = Ink,
         onPrimary = Color.White,
@@ -76,6 +107,42 @@ private val QualiaColors =
         onError = Color.White,
         errorContainer = Color(0xFFF7DAD7),
         onErrorContainer = Color(0xFF3B0907),
+        scrim = Ink,
+    )
+
+/**
+ * The dark scheme: the mark's two tones with their roles swapped.
+ *
+ * `background` is the ink and `onBackground` is the plate, which is the whole idea; the
+ * surfaces are that same ink lifted, and the error red is the same hue lightened. It is
+ * `internal` rather than private so that the contrast of every pair can be checked by a test
+ * instead of by eye on one screen.
+ */
+internal val QualiaDarkColors =
+    darkColorScheme(
+        primary = Plate,
+        onPrimary = Ink,
+        primaryContainer = RaisedMore,
+        onPrimaryContainer = Plate,
+        secondary = MutedPlate,
+        onSecondary = Ink,
+        secondaryContainer = RaisedMore,
+        onSecondaryContainer = Plate,
+        tertiary = Plate,
+        onTertiary = Ink,
+        background = Ink,
+        onBackground = Plate,
+        surface = Raised,
+        onSurface = Plate,
+        surfaceVariant = RaisedMore,
+        onSurfaceVariant = MutedPlate,
+        surfaceContainerHighest = RaisedMore,
+        outline = Color(0xFF46585E),
+        outlineVariant = Color(0xFF2A383D),
+        error = AlertOnDark,
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
         scrim = Ink,
     )
 
